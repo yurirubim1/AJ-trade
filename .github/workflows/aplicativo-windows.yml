@@ -1,0 +1,41 @@
+name: Gerar o aplicativo do Windows
+
+# Gera o .exe no próprio GitHub. O resultado fica em Actions > (execução) > Artifacts.
+# Se você criar uma tag começando com "v" (ex.: v1.2.0), o .exe também entra numa Release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AJ-Trade-Value-Windows
+          path: dist/*.exe
+          if-no-files-found: error
+      - name: Publicar na Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+          body: |
+            Aplicativo do AJ Trade Value para Windows.
+
+            - `AJ-Trade-Value-instalador-*.exe`: instala no computador e cria atalho.
+            - `AJ-Trade-Value-*.exe`: versão portátil, abre direto sem instalar.
+
+            Os valores vêm do AJ Item Worth Wiki e são atualizados sozinhos uma vez por dia.

@@ -51,12 +51,21 @@ if (withPhotos) {
       onProgress: (n, total, bad) => { if (n % 50 === 0 || n === total) process.stdout.write(`\r   fotos: ${n} / ${total}${bad ? ` (${bad} sem imagem)` : ''}   `); },
     });
     log('');
-    for (const it of items) for (const v of it[7]) v[6] = index.has(v[6]) ? index.get(v[6]) : -1;
+    for (const it of items) for (const v of it[7]) applyPhoto(v, index);
     sprite = { dir: 'img', cell: CELL, cols: COLS, perSheet: PER_SHEET, sheets };
+    // O aplicativo usa este mapa para reaproveitar os sprites quando atualiza os valores sozinho.
+    fs.writeFileSync(path.join(root, 'img', 'photos.json'), JSON.stringify({ files: imagePaths, sprites: Object.fromEntries(index) }));
     log(`   ${index.size} fotos em ${sheets} sprites${failed ? `, ${failed} sem imagem` : ''}`);
   }
 }
-if (!sprite) for (const it of items) for (const v of it[7]) v[6] = -1;
+if (!sprite) for (const it of items) for (const v of it[7]) applyPhoto(v, new Map());
+
+// v[6] = número do sprite (-1 se não houver); v[7] = caminho da foto no wiki, só para quem ficou sem sprite
+function applyPhoto(v, index) {
+  const wikiPath = v[6];
+  v[6] = index.has(wikiPath) ? index.get(wikiPath) : -1;
+  if (v[6] < 0 && wikiPath) v[7] = wikiPath;
+}
 
 const data = { v: 2, generated: new Date().toISOString().slice(0, 10), source: 'https://aj-item-worth.fandom.com', sprite, strings, items };
 const out = path.join(root, 'items.js');

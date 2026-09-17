@@ -58,6 +58,16 @@ h1{font:400 clamp(34px, 6vw, 52px)/1 var(--display); margin:6px 0 0; letter-spac
 .unit-chip{display:inline-flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:5px 12px 5px 6px; color:var(--ink); font-weight:700}
 .unit-chip .pl{font:400 13px/1 var(--display); background:var(--ink); color:var(--surface); border-radius:999px; padding:5px 8px 4px}
 
+/* barra de atualização (só no aplicativo) */
+.app-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:7px 8px 7px 14px; margin-bottom:14px; font-size:13px; font-weight:700; color:var(--muted)}
+.app-bar .dot{width:9px; height:9px; border-radius:50%; background:var(--win); flex:none}
+.app-bar.running .dot{background:var(--fair); animation:pulse 1.2s ease-in-out infinite}
+.app-bar.error .dot{background:var(--loss)}
+.app-bar .btn{margin-left:auto}
+.app-bar .btn[disabled]{opacity:.55; cursor:default}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion: reduce){ .app-bar.running .dot{animation:none} }
+
 /* trade layout */
 .trade{display:grid; grid-template-columns:minmax(0,1fr) minmax(250px,300px) minmax(0,1fr); gap:16px; align-items:start}
 .side{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px; border-top:5px solid var(--side-color)}
@@ -209,6 +219,12 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     </div>
   </header>
 
+  <div class="app-bar" id="app-bar" hidden>
+    <span class="dot" aria-hidden="true"></span>
+    <span id="app-status">Valores atualizados</span>
+    <button class="btn" id="app-update" type="button">Atualizar agora</button>
+  </div>
+
   <main class="trade">
     <section class="side give" aria-labelledby="h-give">
       <div class="side-head">
@@ -335,9 +351,9 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   // ---------- data ----------
   // item: [name, ptName, group, slot, page, updated, keywords, variants]; variant: [v, vpt, lo, hi, flags, worthIdx, spriteIdx]
   const groups = DATA.items.map(([n, pt, g, s, p, u, k, vars], gi) => {
-    const variants = vars.map(([v, vpt, lo, hi, f, wi, img], vi) => ({
+    const variants = vars.map(([v, vpt, lo, hi, f, wi, img, wikiImg], vi) => ({
       vi, v, vpt: vpt || v, lo, hi, mid: lo == null ? null : (lo + hi) / 2,
-      flags: f ? f.split(',') : [], worth: DATA.strings[wi], img: typeof img === 'number' ? img : -1,
+      flags: f ? f.split(',') : [], worth: DATA.strings[wi], img: typeof img === 'number' ? img : -1, wikiImg: wikiImg || '',
       vN: norm(`${v} ${vpt}`),
     }));
     const mids = variants.map(x => x.mid).filter(x => x != null);
@@ -420,17 +436,30 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     };
     img.src = `${SP.dir}/s${sheet}.webp`;
   }
+  const WIKI_IMAGES = 'https://static.wikia.nocookie.net/aj-item-worth/images/';
   function thumb(g, vr, size, groupFallback = false) {
     let idx = vr ? vr.img : -1;
-    if (idx < 0 && groupFallback) idx = g.variants.find(x => x.img >= 0)?.img ?? -1;
+    let wikiImg = vr?.wikiImg || '';
+    if (idx < 0 && groupFallback) {
+      const alt = g.variants.find(x => x.img >= 0 || x.wikiImg);
+      idx = alt?.img ?? -1; wikiImg = alt?.wikiImg || wikiImg;
+    }
     const box = `width:${size}px;height:${size}px`;
     const sheet = SP && idx >= 0 ? Math.floor(idx / SP.perSheet) : -1;
+    if (sheet < 0 && wikiImg) { // item novo, ainda sem foto no pacote: busca direto do wiki
+      return `<span class="thumb" style="${box}" data-fallback="${esc(swatch(g, vr))}"><img alt="" loading="lazy" style="width:${size - 4}px;height:${size - 4}px;object-fit:contain" src="${WIKI_IMAGES}${esc(wikiImg)}/revision/latest"></span>`;
+    }
     if (sheet < 0 || sheetState[sheet] === 'fail') return `<span class="thumb" style="${box}">${swatch(g, vr)}</span>`;
     ensureSheet(sheet);
     const cell = size - 4, local = idx % SP.perSheet, col = local % SP.cols, row = Math.floor(local / SP.cols);
     const art = `width:${cell}px;height:${cell}px;background-image:url(${SP.dir}/s${sheet}.webp);background-size:${SP.cols * cell}px auto;background-position:-${col * cell}px -${row * cell}px`;
     return `<span class="thumb" style="${box}"><span class="spr" style="${art}" role="img" aria-label="${esc(displayName(g))}"></span></span>`;
   }
+
+  document.addEventListener('error', e => { // foto do wiki indisponível (sem internet, por exemplo)
+    const box = e.target.tagName === 'IMG' && e.target.parentElement;
+    if (box && box.dataset.fallback != null) box.innerHTML = box.dataset.fallback;
+  }, true);
 
   const displayName = g => g.pt || g.n;
   const variantLabel = vr => vr.vpt || vr.v;
@@ -741,6 +770,26 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   // ---------- boot ----------
   const updated = DATA.generated ? new Date(`${DATA.generated}T12:00:00`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   $('source-line').innerHTML = `${nf(totalVariants, 0)} itens e cores do <a href="https://aj-item-worth.fandom.com" target="_blank" rel="noopener">AJ Item Worth Wiki</a>${updated ? ` · ${updated}` : ''}`;
+  // No aplicativo: barra com o estado da atualização diária dos valores.
+  if (window.ajApp) {
+    const bar = $('app-bar'), statusText = $('app-status'), button = $('app-update');
+    const when = iso => { try { return new Date(iso).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }); } catch { return ''; } };
+    const paint = s => {
+      bar.hidden = false;
+      bar.classList.toggle('running', s.state === 'running');
+      bar.classList.toggle('error', s.state === 'error');
+      button.disabled = s.state === 'running';
+      button.textContent = s.state === 'running' ? 'Atualizando…' : 'Atualizar agora';
+      statusText.textContent = s.state === 'running' ? s.step
+        : s.state === 'error' ? s.step
+        : s.updatedAt ? `Valores baixados em ${when(s.updatedAt)} · o aplicativo atualiza sozinho uma vez por dia`
+        : 'O aplicativo atualiza os valores sozinho uma vez por dia';
+    };
+    button.addEventListener('click', () => window.ajApp.updateNow());
+    window.ajApp.onStatus(paint);
+    window.ajApp.getStatus().then(paint).catch(() => { bar.hidden = false; });
+  }
+
   state = load();
   render();
 })();

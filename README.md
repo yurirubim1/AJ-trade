@@ -2,7 +2,19 @@
 
 Calculadora de trocas do **Animal Jam Classic**. Você coloca até 4 itens de cada lado, igual à janela de troca do jogo, e a balança diz se **vale muito**, **vale**, é **justo**, **não vale** ou **não aceite**.
 
-## Como usar
+## Aplicativo para Windows
+
+Tem uma versão em aplicativo, que abre em janela própria e **atualiza os valores sozinho uma vez por dia**.
+
+- **Pronto para usar:** baixe o `.exe` em [Releases](https://github.com/yurirubim1/AJ-trade/releases) ou na aba Actions, no artefato da última execução. O instalador cria o atalho; o arquivo sem "instalador" no nome abre direto, sem instalar.
+- **Gerar aqui no seu PC:** `npm install` e depois `npm run exe`. Os arquivos saem na pasta `dist/`.
+- **Testar sem empacotar:** `npm start`.
+
+Na primeira vez o Windows pode mostrar o aviso "Windows protegeu o computador", porque o programa não é assinado digitalmente. Clique em **Mais informações → Executar assim mesmo**.
+
+Dentro do aplicativo, a barra no topo mostra quando os valores foram baixados e tem o botão **Atualizar agora** (ou tecla F5). A atualização leva menos de um minuto e acontece sozinha quando o aplicativo abre, se já passou um dia da última. Sem internet, o aplicativo continua funcionando com os valores que já tem.
+
+## Como usar (versão site)
 
 Abra o `index.html` no navegador. Não precisa instalar nada.
 
