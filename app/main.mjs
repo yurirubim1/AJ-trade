@@ -145,6 +145,10 @@ function createWindow() {
         await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(seletor)})?.click()`).catch(() => {});
         await new Promise(r => setTimeout(r, Number(process.env.AJ_WAIT) || 900));
       }
+      if (process.env.AJ_EVAL) {
+        const resultado = await win.webContents.executeJavaScript(process.env.AJ_EVAL).catch(err => `erro: ${err.message}`);
+        console.log('AJ_EVAL:', JSON.stringify(resultado));
+      }
       for (let tentativa = 0; tentativa < 3; tentativa++) {
         win.show(); win.focus();
         const png = (await win.webContents.capturePage()).toPNG();

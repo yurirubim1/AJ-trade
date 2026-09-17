@@ -96,6 +96,23 @@ input[type="number"]{width:98px; font-variant-numeric:tabular-nums}
 .btn[disabled]{opacity:.5; cursor:default}
 .auto-status{font-size:13px; color:var(--muted); font-weight:700}
 .auto-status.erro{color:var(--loss)}
+.auto-status.ok{color:var(--win)}
+.auto-status.contando{color:var(--fair); font-size:15px}
+.auto-status.rodando{color:var(--get)}
+.step .marcar{border:1px solid var(--get); background:var(--get-soft); color:var(--get); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:800; white-space:nowrap}
+.step .marcar:hover{background:var(--get); color:#fff}
+.step .marcar[disabled]{opacity:.45; cursor:default}
+.step .junto{display:inline-flex; gap:8px; flex-wrap:wrap}
+.step .unidade{font-size:12px; color:var(--muted)}
+.step .depois{margin-left:6px}
+.step .depois input{width:78px}
+.step.piscar{animation:piscar .7s ease}
+@keyframes piscar{0%,100%{box-shadow:none}35%{box-shadow:0 0 0 3px var(--get)}}
+@media (prefers-reduced-motion: reduce){ .step.piscar{animation:none} }
+.passo-a-passo{display:flex; flex-wrap:wrap; gap:10px 22px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:12px 16px; font-size:13px; color:var(--muted)}
+.passo-a-passo b{color:var(--ink)}
+.passo-a-passo span{display:flex; align-items:center; gap:8px}
+.passo-a-passo i{display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--get); color:#fff; font:400 13px/1 var(--display); font-style:normal}
 .auto-ajuda{margin-bottom:8px}
 
 /* barra de atualização (só no aplicativo) */
@@ -357,6 +374,13 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   </div><!-- fim do painel de trocas -->
 
   <section id="painel-auto" hidden aria-label="Automação">
+    <div class="passo-a-passo">
+      <span><i>1</i> Adicione os passos na ordem</span>
+      <span><i>2</i> Em cliques, use <b>Marcar posição</b> e leve o mouse ao lugar certo</span>
+      <span><i>3</i> Teste um passo sozinho no <b>▶</b> da direita</span>
+      <span><i>4</i> <b>Rodar</b> executa tudo · <b>F9</b> para na hora</span>
+    </div>
+
     <div class="auto-top">
       <div class="auto-macros">
         <label for="auto-lista">Automação</label>
@@ -395,8 +419,9 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     <div class="card auto-ajuda">
       <h3>Como usar</h3>
       <ul>
-        <li>Monte os passos na ordem. Cada passo tem sua própria espera depois de executar.</li>
-        <li>Clique num passo para escolhê-lo e aperte <b>F8</b> com o mouse em cima do alvo: as coordenadas entram sozinhas. Sem passo escolhido, o F8 cria um clique novo naquele ponto.</li>
+        <li>Monte os passos na ordem. Cada passo espera o tempo do campo <b>depois, esperar</b>; deixando vazio, vale a "espera entre passos" lá de cima.</li>
+        <li>Para marcar onde clicar, use o botão <b>📍 Marcar posição</b>: ele conta 3 segundos e guarda onde o mouse estiver. O <b>F8</b> faz o mesmo, sem contagem, no passo que estiver escolhido.</li>
+        <li>O botão <b>▶</b> de cada passo executa só aquele passo, para você conferir antes de rodar tudo.</li>
         <li><b>F9</b> para tudo na hora, mesmo com outro programa na frente.</li>
         <li>A espera antes de começar serve para você trocar de janela antes do primeiro clique.</li>
         <li>As coordenadas são do monitor inteiro, contadas a partir do canto superior esquerdo.</li>
@@ -433,11 +458,12 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   if (!window.ajAuto) return;
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const espera = ms => new Promise(r => setTimeout(r, ms));
   const TITULOS = {
     trocas: ['Vale a troca?', 'Coloque até 4 itens de cada lado, igual à janela de troca do Animal Jam Classic. A balança mostra quem sai ganhando.'],
     auto: ['Automação', 'Monte uma sequência de cliques, textos e teclas e deixe o computador repetir para você. Serve para qualquer programa: editor, jogo em teste, formulário.'],
   };
-  const NOMES = { clique: 'Clique', mover: 'Mover mouse', texto: 'Escrever', tecla: 'Tecla', esperar: 'Esperar', rolar: 'Rolagem' };
+  const NOMES = { clique: 'Clicar', mover: 'Mover mouse', texto: 'Escrever', tecla: 'Tecla', esperar: 'Esperar', rolar: 'Rolagem' };
   const NOVO = {
     clique: () => ({ tipo: 'clique', x: 0, y: 0, botao: 'esquerdo', vezes: 1 }),
     mover: () => ({ tipo: 'mover', x: 0, y: 0 }),
@@ -446,44 +472,74 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     esperar: () => ({ tipo: 'esperar', ms: 1000 }),
     rolar: () => ({ tipo: 'rolar', quantidade: -3 }),
   };
+  const letras = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  const TECLAS = [
+    ['Mais usadas', ['enter', 'tab', 'esc', 'espaco', 'backspace', 'delete']],
+    ['Navegação', ['cima', 'baixo', 'esquerda', 'direita', 'home', 'end', 'pageup', 'pagedown']],
+    ['F1 a F12', Array.from({ length: 12 }, (_, i) => `f${i + 1}`)],
+    ['Letras', letras],
+    ['Números', Array.from({ length: 10 }, (_, i) => String(i))],
+  ];
 
-  let passos = [], macroId = null, selecionado = -1, rodando = false;
+  let passos = [], macroId = null, selecionado = -1, capturando = false, rodando = false;
   const RASCUNHO = 'aj-auto-rascunho';
 
+  // ---------- desenhar ----------
+  const numero = (p, campo, rotulo, i, extra = '') =>
+    `<label title="${esc(rotulo)}">${rotulo} <input type="number" data-campo="${campo}" data-i="${i}" value="${esc(p[campo] ?? 0)}" ${extra}></label>`;
+
   function campos(p, i) {
-    const num = (campo, label, extra = '') => `<label>${label} <input type="number" data-campo="${campo}" data-i="${i}" value="${esc(p[campo] ?? 0)}" ${extra}></label>`;
+    const marcar = `<button type="button" class="marcar" data-marcar="${i}" title="Conta 3 segundos e guarda onde o mouse estiver">📍 Marcar posição</button>`;
     switch (p.tipo) {
-      case 'clique': return `${num('x', 'X')} ${num('y', 'Y')}
+      case 'clique': return `${numero(p, 'x', 'X', i)} ${numero(p, 'y', 'Y', i)} ${marcar}
         <label>Botão <select data-campo="botao" data-i="${i}">${['esquerdo', 'direito', 'meio'].map(b => `<option${p.botao === b ? ' selected' : ''}>${b}</option>`).join('')}</select></label>
-        ${num('vezes', 'Vezes', 'min="1" max="20"')}`;
-      case 'mover': return `${num('x', 'X')} ${num('y', 'Y')}`;
-      case 'texto': return `<input class="grow" type="text" data-campo="texto" data-i="${i}" value="${esc(p.texto)}" placeholder="texto que será digitado">
-        ${num('atrasoPorLetra', 'ms por letra', 'min="0" step="10"')}`;
-      case 'tecla': return `<label>Tecla <input type="text" data-campo="tecla" data-i="${i}" value="${esc(p.tecla)}" style="width:110px" placeholder="enter, f5, a"></label>
-        ${['ctrl', 'shift', 'alt', 'win'].map(m => `<label><input type="checkbox" data-mod="${m}" data-i="${i}"${(p.modificadores || []).includes(m) ? ' checked' : ''}> ${m}</label>`).join(' ')}`;
-      case 'esperar': return num('ms', 'Tempo', 'min="0" step="100"') + '<span class="item-sub">ms</span>';
-      case 'rolar': return num('quantidade', 'Cliques da rodinha', 'step="1"') + '<span class="item-sub">negativo desce</span>';
+        ${numero(p, 'vezes', 'Vezes', i, 'min="1" max="20"')}`;
+      case 'mover': return `${numero(p, 'x', 'X', i)} ${numero(p, 'y', 'Y', i)} ${marcar}`;
+      case 'texto': return `<input class="grow" type="text" data-campo="texto" data-i="${i}" value="${esc(p.texto)}" placeholder="o que será digitado">
+        ${numero(p, 'atrasoPorLetra', 'ms por letra', i, 'min="0" step="10"')}`;
+      case 'tecla': return `<label>Tecla <select data-campo="tecla" data-i="${i}">
+          ${TECLAS.map(([grupo, teclas]) => `<optgroup label="${grupo}">${teclas.map(t => `<option value="${t}"${p.tecla === t ? ' selected' : ''}>${t === 'espaco' ? 'espaço' : t}</option>`).join('')}</optgroup>`).join('')}
+        </select></label>
+        <span class="junto">${['ctrl', 'shift', 'alt', 'win'].map(m => `<label><input type="checkbox" data-mod="${m}" data-i="${i}"${(p.modificadores || []).includes(m) ? ' checked' : ''}> ${m}</label>`).join('')}</span>`;
+      case 'esperar': return numero(p, 'ms', 'Tempo', i, 'min="0" step="100"') + '<span class="unidade">ms</span>';
+      case 'rolar': return numero(p, 'quantidade', 'Rodinha', i, 'step="1"') + '<span class="unidade">negativo desce a tela</span>';
       default: return '';
     }
   }
 
-  function desenhar() {
+  function render() {
     const lista = $('auto-passos');
-    if (!passos.length) { lista.innerHTML = '<li class="vazio">Nenhum passo ainda. Use os botões acima, ou aperte F8 com o mouse onde quer clicar.</li>'; return; }
+    if (!passos.length) {
+      lista.innerHTML = '<li class="vazio">Sem passos ainda. Clique num dos botões acima para começar — por exemplo <b>Clique</b> e depois <b>Marcar posição</b>.</li>';
+      return;
+    }
+    const padrao = config().atrasoPadrao;
     lista.innerHTML = passos.map((p, i) => `<li class="step${i === selecionado ? ' sel' : ''}" data-tipo="${p.tipo}" data-i="${i}">
       <span class="num"></span><span class="kind">${NOMES[p.tipo]}</span>
       ${campos(p, i)}
-      <label>Espera depois <input type="number" data-campo="atraso" data-i="${i}" value="${p.atraso ?? ''}" placeholder="padrão" min="0" step="10" style="width:86px"></label>
+      ${p.tipo === 'esperar' ? '' : `<label class="depois" title="Tempo parado depois deste passo">depois, esperar <input type="number" data-campo="atraso" data-i="${i}" value="${p.atraso ?? ''}" placeholder="${padrao}" min="0" step="10"> ms</label>`}
       <span class="acoes">
-        <button type="button" data-acao="cima" data-i="${i}" aria-label="Subir passo">↑</button>
-        <button type="button" data-acao="baixo" data-i="${i}" aria-label="Descer passo">↓</button>
-        <button type="button" data-acao="copiar" data-i="${i}" aria-label="Duplicar passo">⧉</button>
-        <button type="button" data-acao="apagar" data-i="${i}" aria-label="Remover passo">×</button>
+        <button type="button" data-acao="testar" data-i="${i}" title="Executar só este passo">▶</button>
+        <button type="button" data-acao="cima" data-i="${i}" title="Subir">↑</button>
+        <button type="button" data-acao="baixo" data-i="${i}" title="Descer">↓</button>
+        <button type="button" data-acao="copiar" data-i="${i}" title="Duplicar">⧉</button>
+        <button type="button" data-acao="apagar" data-i="${i}" title="Remover">×</button>
       </span>
     </li>`).join('');
   }
 
-  const guardarRascunho = () => { try { localStorage.setItem(RASCUNHO, JSON.stringify({ macroId, nome: $('auto-nome').value, passos, cfg: config() })); } catch {} };
+  const linha = i => document.querySelector(`.step[data-i="${i}"]`);
+  function selecionar(i) { // troca só a marcação, sem redesenhar: assim o campo em edição não perde o foco
+    selecionado = i;
+    document.querySelectorAll('.step').forEach(el => el.classList.toggle('sel', Number(el.dataset.i) === i));
+  }
+  function piscar(i) {
+    const el = linha(i);
+    if (!el) return;
+    el.classList.add('piscar');
+    setTimeout(() => el.classList.remove('piscar'), 700);
+  }
+
   const config = () => ({
     repeticoes: Math.max(1, +$('auto-repeticoes').value || 1),
     intervalo: Math.max(0, +$('auto-intervalo').value || 0),
@@ -496,28 +552,73 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     $('auto-atraso').value = c.atrasoPadrao ?? 120;
     $('auto-inicio').value = c.esperaInicial ?? 3000;
   }
+  const guardar = () => { try { localStorage.setItem(RASCUNHO, JSON.stringify({ macroId, nome: $('auto-nome').value, passos, cfg: config() })); } catch {} };
 
-  function mudou() { desenhar(); guardarRascunho(); }
+  function aviso(texto, tipo = '') {
+    const el = $('auto-status');
+    el.innerHTML = texto;
+    el.className = `auto-status ${tipo}`;
+  }
+  const dica = () => aviso('Dica: escolha um passo e aperte <b>F8</b> para guardar onde o mouse está. <b>F9</b> para tudo.');
 
+  // ---------- marcar posição ----------
+  async function marcarPosicao(i) {
+    if (capturando || rodando) return;
+    capturando = true;
+    document.querySelectorAll('.marcar').forEach(b => (b.disabled = true));
+    try {
+      for (let s = 3; s > 0; s--) {
+        aviso(`Leve o mouse até o ponto certo… <b>${s}</b>`, 'contando');
+        await espera(1000);
+      }
+      const { x, y } = await window.ajAuto.cursor();
+      if (i >= 0 && passos[i] && (passos[i].tipo === 'clique' || passos[i].tipo === 'mover')) {
+        passos[i].x = x; passos[i].y = y;
+        const el = linha(i);
+        el.querySelector('[data-campo="x"]').value = x;
+        el.querySelector('[data-campo="y"]').value = y;
+        piscar(i);
+      } else {
+        passos.push({ ...NOVO.clique(), x, y });
+        render();
+        selecionar(passos.length - 1);
+        piscar(passos.length - 1);
+      }
+      guardar();
+      aviso(`Posição guardada: <b>${x}, ${y}</b>`, 'ok');
+    } finally {
+      capturando = false;
+      document.querySelectorAll('.marcar').forEach(b => (b.disabled = false));
+    }
+  }
+
+  // ---------- eventos da lista ----------
   $('auto-passos').addEventListener('click', e => {
+    const marcar = e.target.closest('[data-marcar]');
+    if (marcar) { selecionar(+marcar.dataset.marcar); marcarPosicao(+marcar.dataset.marcar); return; }
     const acao = e.target.closest('[data-acao]');
     if (acao) {
       const i = +acao.dataset.i;
-      const tipo = acao.dataset.acao;
-      if (tipo === 'apagar') passos.splice(i, 1);
-      if (tipo === 'copiar') passos.splice(i + 1, 0, structuredClone(passos[i]));
-      if (tipo === 'cima' && i > 0) passos.splice(i - 1, 0, passos.splice(i, 1)[0]);
-      if (tipo === 'baixo' && i < passos.length - 1) passos.splice(i + 1, 0, passos.splice(i, 1)[0]);
-      selecionado = -1;
-      mudou();
+      switch (acao.dataset.acao) {
+        case 'apagar': passos.splice(i, 1); selecionado = -1; break;
+        case 'copiar': passos.splice(i + 1, 0, structuredClone(passos[i])); selecionado = i + 1; break;
+        case 'cima': if (i > 0) { passos.splice(i - 1, 0, passos.splice(i, 1)[0]); selecionado = i - 1; } break;
+        case 'baixo': if (i < passos.length - 1) { passos.splice(i + 1, 0, passos.splice(i, 1)[0]); selecionado = i + 1; } break;
+        case 'testar': testarPasso(i); return;
+      }
+      render(); guardar();
       return;
     }
-    const linha = e.target.closest('.step');
-    if (linha) { selecionado = +linha.dataset.i; desenhar(); }
+    const alvo = e.target.closest('.step');
+    if (alvo) selecionar(+alvo.dataset.i);
+  });
+  $('auto-passos').addEventListener('focusin', e => {
+    const alvo = e.target.closest('.step');
+    if (alvo) selecionar(+alvo.dataset.i);
   });
   $('auto-passos').addEventListener('input', e => {
     const alvo = e.target, i = +alvo.dataset.i;
-    if (Number.isNaN(i)) return;
+    if (Number.isNaN(i) || !passos[i]) return;
     if (alvo.dataset.mod) {
       const mods = new Set(passos[i].modificadores || []);
       alvo.checked ? mods.add(alvo.dataset.mod) : mods.delete(alvo.dataset.mod);
@@ -526,39 +627,55 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       const campo = alvo.dataset.campo;
       passos[i][campo] = alvo.type === 'number' ? (alvo.value === '' ? undefined : +alvo.value) : alvo.value;
     }
-    guardarRascunho();
+    guardar();
   });
+
   document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
-    passos.push(NOVO[b.dataset.add]());
-    selecionado = passos.length - 1;
-    mudou();
+    const tipo = b.dataset.add;
+    passos.push(NOVO[tipo]());
+    render();
+    selecionar(passos.length - 1);
+    guardar();
+    if (tipo === 'clique' || tipo === 'mover') marcarPosicao(passos.length - 1);
+    else {
+      const campo = linha(passos.length - 1)?.querySelector('input[type="text"], input[type="number"], select');
+      campo?.focus();
+      if (campo?.select) campo.select();
+    }
   }));
-  document.querySelectorAll('.auto-config input').forEach(i => i.addEventListener('input', guardarRascunho));
+  document.querySelectorAll('.auto-config input').forEach(i => i.addEventListener('input', () => {
+    guardar();
+    if (i.id === 'auto-atraso') document.querySelectorAll('[data-campo="atraso"]').forEach(c => (c.placeholder = config().atrasoPadrao));
+  }));
 
-  // F8 em qualquer lugar da tela: marca a posição do mouse
-  window.ajAuto.onPosition(({ x, y }) => {
+  window.ajAuto.onPosition(({ x, y }) => { // tecla F8
     const p = passos[selecionado];
-    if (p && (p.tipo === 'clique' || p.tipo === 'mover')) { p.x = x; p.y = y; }
-    else { passos.push({ ...NOVO.clique(), x, y }); selecionado = passos.length - 1; }
-    mudou();
-    aviso(`Posição marcada: ${x}, ${y}`);
+    if (p && (p.tipo === 'clique' || p.tipo === 'mover')) {
+      p.x = x; p.y = y;
+      const el = linha(selecionado);
+      el.querySelector('[data-campo="x"]').value = x;
+      el.querySelector('[data-campo="y"]').value = y;
+      piscar(selecionado);
+    } else {
+      passos.push({ ...NOVO.clique(), x, y });
+      render();
+      selecionar(passos.length - 1);
+      piscar(passos.length - 1);
+    }
+    guardar();
+    aviso(`Posição guardada: <b>${x}, ${y}</b>`, 'ok');
   });
 
-  function aviso(texto, erro = false) {
-    const el = $('auto-status');
-    el.innerHTML = esc(texto);
-    el.classList.toggle('erro', erro);
-  }
-
-  // lista de automações salvas
-  async function recarregarLista(selecionar) {
+  // ---------- automações salvas ----------
+  async function recarregarLista(selecionarId) {
     const macros = await window.ajAuto.list();
-    $('auto-lista').innerHTML = `<option value="">— nova automação —</option>` + macros.map(m => `<option value="${esc(m.id)}"${m.id === selecionar ? ' selected' : ''}>${esc(m.nome || m.id)}</option>`).join('');
+    $('auto-lista').innerHTML = '<option value="">— nova automação —</option>' +
+      macros.map(m => `<option value="${esc(m.id)}"${m.id === selecionarId ? ' selected' : ''}>${esc(m.nome || m.id)}</option>`).join('');
     return macros;
   }
   $('auto-lista').addEventListener('change', async e => {
     const id = e.target.value;
-    if (!id) { macroId = null; $('auto-nome').value = ''; passos = []; aplicarConfig(); mudou(); return; }
+    if (!id) { macroId = null; $('auto-nome').value = ''; passos = []; aplicarConfig(); render(); guardar(); return; }
     const macro = (await window.ajAuto.list()).find(m => m.id === id);
     if (!macro) return;
     macroId = macro.id;
@@ -566,29 +683,52 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     passos = macro.passos || [];
     aplicarConfig(macro);
     selecionado = -1;
-    mudou();
+    render(); guardar();
+    aviso(`Abriu: <b>${esc(macro.nome || macro.id)}</b>`);
   });
-  $('auto-novo').addEventListener('click', () => { macroId = null; $('auto-nome').value = ''; passos = []; selecionado = -1; $('auto-lista').value = ''; mudou(); });
+  $('auto-novo').addEventListener('click', () => {
+    macroId = null; $('auto-nome').value = ''; passos = []; selecionado = -1; $('auto-lista').value = '';
+    render(); guardar(); dica();
+  });
   $('auto-salvar').addEventListener('click', async () => {
     const nome = $('auto-nome').value.trim() || 'Sem nome';
     const salvo = await window.ajAuto.save({ id: macroId, nome, passos, ...config() });
     macroId = salvo.id;
     await recarregarLista(macroId);
-    aviso(`Salvo: ${nome}`);
+    aviso(`Salvo: <b>${esc(nome)}</b>`, 'ok');
   });
   $('auto-apagar').addEventListener('click', async () => {
-    if (!macroId) return;
+    if (!macroId) { aviso('Esta automação ainda não foi salva.'); return; }
     await window.ajAuto.remove(macroId);
-    macroId = null; $('auto-nome').value = ''; passos = []; mudou();
+    macroId = null; $('auto-nome').value = ''; passos = []; render(); guardar();
     await recarregarLista();
     aviso('Automação apagada.');
   });
 
-  // rodar e parar
-  $('auto-rodar').addEventListener('click', async () => {
+  // ---------- rodar ----------
+  async function contagem(ms) {
+    for (let s = Math.ceil(ms / 1000); s > 0; s--) {
+      aviso(`Começando em <b>${s}</b>… deixe na frente a janela onde a automação vai agir`, 'contando');
+      await espera(Math.min(1000, ms));
+    }
+  }
+  async function testarPasso(i) {
+    if (rodando) return;
     try {
-      await window.ajAuto.run({ passos, ...config() });
-    } catch (err) { aviso(String(err.message || err), true); }
+      const passo = passos[i];
+      if (passo.tipo === 'clique' || passo.tipo === 'mover') await contagem(1000);
+      else await contagem(2000); // texto e teclas vão para a janela que estiver na frente
+      await window.ajAuto.run({ passos: [passo], repeticoes: 1, esperaInicial: 0, atrasoPadrao: 0 });
+    } catch (err) { aviso(`Erro: ${esc(err.message || err)}`, 'erro'); }
+  }
+  $('auto-rodar').addEventListener('click', async () => {
+    if (rodando) return;
+    if (!passos.length) { aviso('Adicione pelo menos um passo antes de rodar.', 'erro'); return; }
+    const cfg = config();
+    try {
+      if (cfg.esperaInicial > 0) await contagem(cfg.esperaInicial);
+      await window.ajAuto.run({ passos, ...cfg, esperaInicial: 0 });
+    } catch (err) { aviso(`Erro: ${esc(err.message || err)}`, 'erro'); }
   });
   $('auto-parar').addEventListener('click', () => window.ajAuto.stop());
 
@@ -596,16 +736,16 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     if (evento.tipo === 'inicio') {
       rodando = true;
       $('auto-rodar').disabled = true; $('auto-parar').disabled = false;
-      aviso(`Rodando ${evento.passos} passos, ${evento.repeticoes}× · F9 para parar`);
+      aviso(`Rodando ${evento.passos} ${evento.passos === 1 ? 'passo' : 'passos'}, ${evento.repeticoes}× · <b>F9</b> para parar`, 'rodando');
     } else if (evento.tipo === 'passo') {
       document.querySelectorAll('.step.agora').forEach(el => el.classList.remove('agora'));
-      document.querySelector(`.step[data-i="${evento.passo - 1}"]`)?.classList.add('agora');
+      linha(evento.passo - 1)?.classList.add('agora');
     } else if (evento.tipo === 'volta') {
-      aviso(`Volta ${evento.volta} terminada`);
+      aviso(`Volta ${evento.volta} terminada`, 'rodando');
     } else if (evento.tipo === 'erro') {
-      aviso(`Erro: ${evento.mensagem}`, true);
+      aviso(`Erro: ${esc(evento.mensagem)}`, 'erro');
     } else if (evento.tipo === 'fim') {
-      aviso('Terminou.');
+      aviso('Terminou.', 'ok');
     } else if (evento.tipo === 'parou') {
       rodando = false;
       $('auto-rodar').disabled = false; $('auto-parar').disabled = true;
@@ -613,7 +753,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     }
   });
 
-  // troca de abas
+  // ---------- abas ----------
   const tabs = $('tabs');
   tabs.hidden = false;
   tabs.addEventListener('click', e => {
@@ -631,12 +771,13 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     try { localStorage.setItem('aj-aba', qual); } catch {}
   }
 
-  // estado inicial
+  // ---------- início ----------
   try {
     const rascunho = JSON.parse(localStorage.getItem(RASCUNHO) || 'null');
     if (rascunho) { macroId = rascunho.macroId || null; $('auto-nome').value = rascunho.nome || ''; passos = rascunho.passos || []; aplicarConfig(rascunho.cfg); }
   } catch {}
-  desenhar();
+  render();
+  dica();
   recarregarLista(macroId);
   let abaInicial = 'trocas';
   try { abaInicial = localStorage.getItem('aj-aba') || 'trocas'; } catch {}

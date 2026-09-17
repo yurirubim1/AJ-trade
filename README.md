@@ -20,7 +20,9 @@ O aplicativo tem uma segunda aba, para automatizar tarefas repetitivas no comput
 
 Passos disponíveis: **clique** (posição, botão, número de cliques), **mover mouse**, **escrever texto** (aceita acentos, com velocidade por letra), **tecla** (com Ctrl, Shift, Alt, Win), **esperar** e **rolagem**. Cada passo tem sua própria espera, e a automação inteira pode repetir quantas vezes quiser, com intervalo entre as voltas.
 
-- **F8**, em qualquer lugar da tela, marca a posição do mouse no passo escolhido. Sem passo escolhido, cria um clique novo ali.
+- **📍 Marcar posição** conta 3 segundos e guarda onde o mouse estiver — assim você não precisa adivinhar coordenada nem largar o mouse no lugar antes de clicar no botão.
+- **▶** em cada passo executa só aquele passo, para conferir antes de rodar a sequência inteira.
+- **F8**, em qualquer lugar da tela, marca a posição na hora, no passo escolhido. Sem passo escolhido, cria um clique novo ali.
 - **F9** para tudo na hora, mesmo com outro programa na frente.
 - A espera antes de começar (3 segundos por padrão) serve para você trocar de janela.
 - As automações ficam salvas por nome e o rascunho atual volta sozinho quando você reabre o app.
