@@ -58,6 +58,46 @@ h1{font:400 clamp(34px, 6vw, 52px)/1 var(--display); margin:6px 0 0; letter-spac
 .unit-chip{display:inline-flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:5px 12px 5px 6px; color:var(--ink); font-weight:700}
 .unit-chip .pl{font:400 13px/1 var(--display); background:var(--ink); color:var(--surface); border-radius:999px; padding:5px 8px 4px}
 
+/* abas e automação (só no aplicativo) */
+.tabs{display:flex; gap:6px; margin-bottom:16px; border-bottom:2px solid var(--line)}
+.tabs button{border:0; background:transparent; font:400 18px/1 var(--display); color:var(--muted); padding:10px 16px; border-radius:10px 10px 0 0; margin-bottom:-2px; border-bottom:3px solid transparent}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--get); background:var(--surface)}
+#painel-auto{display:grid; gap:14px}
+.auto-top{display:grid; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px}
+.auto-macros{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.auto-macros label{font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted)}
+.auto-config{display:flex; flex-wrap:wrap; gap:8px 18px}
+.auto-config label, .steps label{display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--muted)}
+.auto-config span{color:var(--muted); font-size:12px; margin-left:-3px}
+input[type="number"], input[type="text"], select, textarea{border:1px solid var(--line); background:var(--surface-2); color:var(--ink); border-radius:9px; padding:7px 10px; font:inherit; font-size:14px}
+input[type="number"]{width:98px; font-variant-numeric:tabular-nums}
+#auto-lista{min-width:190px}
+#auto-nome{flex:1; min-width:180px}
+.auto-add{display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-weight:800; color:var(--muted); font-size:13px}
+.steps{list-style:none; counter-reset:passo; margin:0; padding:0; display:grid; gap:8px}
+.step{display:flex; flex-wrap:wrap; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--line); border-left:5px solid var(--step-color, var(--line-strong)); border-radius:12px; padding:10px 12px}
+.step.sel{border-color:var(--get); box-shadow:0 0 0 2px var(--get-soft)}
+.step[data-tipo="clique"]{--step-color:var(--get)} .step[data-tipo="mover"]{--step-color:var(--fair)}
+.step[data-tipo="texto"]{--step-color:var(--give)} .step[data-tipo="tecla"]{--step-color:var(--win)}
+.step[data-tipo="esperar"]{--step-color:var(--muted)} .step[data-tipo="rolar"]{--step-color:var(--heart)}
+.step.agora{outline:3px solid var(--fair); outline-offset:1px}
+.step .num{counter-increment:passo; font:400 16px/1 var(--display); color:var(--muted); min-width:24px}
+.step .num::before{content:counter(passo)}
+.step .kind{font:400 15px/1 var(--display); color:var(--step-color); min-width:112px}
+.step .grow{flex:1; min-width:160px}
+.step .acoes{margin-left:auto; display:flex; gap:4px}
+.step .acoes button{border:1px solid var(--line); background:var(--surface-2); border-radius:8px; width:30px; height:30px; font-size:14px; line-height:1; color:var(--muted)}
+.step .acoes button:hover{color:var(--ink); border-color:var(--line-strong)}
+.steps .vazio{color:var(--muted); text-align:center; padding:26px; border:2px dashed var(--line-strong); border-radius:12px}
+.auto-run{display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; position:sticky; bottom:12px; box-shadow:var(--shadow)}
+.btn.primary{background:var(--get); border-color:var(--get); color:#fff}
+.btn.danger{background:var(--loss-soft); border-color:var(--loss-soft); color:var(--loss)}
+.btn[disabled]{opacity:.5; cursor:default}
+.auto-status{font-size:13px; color:var(--muted); font-weight:700}
+.auto-status.erro{color:var(--loss)}
+.auto-ajuda{margin-bottom:8px}
+
 /* barra de atualização (só no aplicativo) */
 .app-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:7px 8px 7px 14px; margin-bottom:14px; font-size:13px; font-weight:700; color:var(--muted)}
 .app-bar .dot{width:9px; height:9px; border-radius:50%; background:var(--win); flex:none}
@@ -219,6 +259,13 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     </div>
   </header>
 
+  <nav class="tabs" id="tabs" role="tablist" hidden>
+    <button type="button" role="tab" data-tab="trocas" aria-selected="true">Trocas do AJ</button>
+    <button type="button" role="tab" data-tab="auto" aria-selected="false">Automação</button>
+  </nav>
+
+  <div id="painel-trocas">
+
   <div class="app-bar" id="app-bar" hidden>
     <span class="dot" aria-hidden="true"></span>
     <span id="app-status">Valores atualizados</span>
@@ -307,6 +354,57 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     </div>
   </section>
 
+  </div><!-- fim do painel de trocas -->
+
+  <section id="painel-auto" hidden aria-label="Automação">
+    <div class="auto-top">
+      <div class="auto-macros">
+        <label for="auto-lista">Automação</label>
+        <select id="auto-lista"></select>
+        <input id="auto-nome" type="text" placeholder="Nome da automação" aria-label="Nome da automação">
+        <button class="btn" type="button" id="auto-novo">Nova</button>
+        <button class="btn" type="button" id="auto-salvar">Salvar</button>
+        <button class="btn" type="button" id="auto-apagar">Apagar</button>
+      </div>
+      <div class="auto-config">
+        <label>Repetições <input id="auto-repeticoes" type="number" min="1" max="100000" value="1"></label>
+        <label>Intervalo entre voltas <input id="auto-intervalo" type="number" min="0" step="100" value="500"><span>ms</span></label>
+        <label>Espera entre passos <input id="auto-atraso" type="number" min="0" step="10" value="120"><span>ms</span></label>
+        <label>Espera antes de começar <input id="auto-inicio" type="number" min="0" step="500" value="3000"><span>ms</span></label>
+      </div>
+    </div>
+
+    <div class="auto-add">
+      <span>Adicionar passo:</span>
+      <button class="btn" type="button" data-add="clique">Clique</button>
+      <button class="btn" type="button" data-add="mover">Mover mouse</button>
+      <button class="btn" type="button" data-add="texto">Escrever texto</button>
+      <button class="btn" type="button" data-add="tecla">Tecla</button>
+      <button class="btn" type="button" data-add="esperar">Esperar</button>
+      <button class="btn" type="button" data-add="rolar">Rolagem</button>
+    </div>
+
+    <ol class="steps" id="auto-passos"></ol>
+
+    <div class="auto-run">
+      <button class="btn primary" type="button" id="auto-rodar">▶ Rodar</button>
+      <button class="btn danger" type="button" id="auto-parar" disabled>■ Parar (F9)</button>
+      <span class="auto-status" id="auto-status">Aperte <b>F8</b> em qualquer lugar da tela para marcar a posição do mouse no passo escolhido.</span>
+    </div>
+
+    <div class="card auto-ajuda">
+      <h3>Como usar</h3>
+      <ul>
+        <li>Monte os passos na ordem. Cada passo tem sua própria espera depois de executar.</li>
+        <li>Clique num passo para escolhê-lo e aperte <b>F8</b> com o mouse em cima do alvo: as coordenadas entram sozinhas. Sem passo escolhido, o F8 cria um clique novo naquele ponto.</li>
+        <li><b>F9</b> para tudo na hora, mesmo com outro programa na frente.</li>
+        <li>A espera antes de começar serve para você trocar de janela antes do primeiro clique.</li>
+        <li>As coordenadas são do monitor inteiro, contadas a partir do canto superior esquerdo.</li>
+        <li>Programas abertos como administrador ignoram cliques e teclas vindos daqui, a não ser que você abra este aplicativo como administrador também.</li>
+      </ul>
+    </div>
+  </section>
+
   <footer>Feito por fãs. Não é afiliado à WildWorks nem ao Animal Jam. Imagens e valores: AJ Item Worth Wiki (Fandom), licença CC BY-SA.</footer>
 </div>
 
@@ -328,6 +426,223 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     <div class="results" id="results"></div>
   </div>
 </dialog>
+
+<script>
+// ---------- Aba Automação (existe só dentro do aplicativo) ----------
+(() => {
+  if (!window.ajAuto) return;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const TITULOS = {
+    trocas: ['Vale a troca?', 'Coloque até 4 itens de cada lado, igual à janela de troca do Animal Jam Classic. A balança mostra quem sai ganhando.'],
+    auto: ['Automação', 'Monte uma sequência de cliques, textos e teclas e deixe o computador repetir para você. Serve para qualquer programa: editor, jogo em teste, formulário.'],
+  };
+  const NOMES = { clique: 'Clique', mover: 'Mover mouse', texto: 'Escrever', tecla: 'Tecla', esperar: 'Esperar', rolar: 'Rolagem' };
+  const NOVO = {
+    clique: () => ({ tipo: 'clique', x: 0, y: 0, botao: 'esquerdo', vezes: 1 }),
+    mover: () => ({ tipo: 'mover', x: 0, y: 0 }),
+    texto: () => ({ tipo: 'texto', texto: '', atrasoPorLetra: 0 }),
+    tecla: () => ({ tipo: 'tecla', tecla: 'enter', modificadores: [] }),
+    esperar: () => ({ tipo: 'esperar', ms: 1000 }),
+    rolar: () => ({ tipo: 'rolar', quantidade: -3 }),
+  };
+
+  let passos = [], macroId = null, selecionado = -1, rodando = false;
+  const RASCUNHO = 'aj-auto-rascunho';
+
+  function campos(p, i) {
+    const num = (campo, label, extra = '') => `<label>${label} <input type="number" data-campo="${campo}" data-i="${i}" value="${esc(p[campo] ?? 0)}" ${extra}></label>`;
+    switch (p.tipo) {
+      case 'clique': return `${num('x', 'X')} ${num('y', 'Y')}
+        <label>Botão <select data-campo="botao" data-i="${i}">${['esquerdo', 'direito', 'meio'].map(b => `<option${p.botao === b ? ' selected' : ''}>${b}</option>`).join('')}</select></label>
+        ${num('vezes', 'Vezes', 'min="1" max="20"')}`;
+      case 'mover': return `${num('x', 'X')} ${num('y', 'Y')}`;
+      case 'texto': return `<input class="grow" type="text" data-campo="texto" data-i="${i}" value="${esc(p.texto)}" placeholder="texto que será digitado">
+        ${num('atrasoPorLetra', 'ms por letra', 'min="0" step="10"')}`;
+      case 'tecla': return `<label>Tecla <input type="text" data-campo="tecla" data-i="${i}" value="${esc(p.tecla)}" style="width:110px" placeholder="enter, f5, a"></label>
+        ${['ctrl', 'shift', 'alt', 'win'].map(m => `<label><input type="checkbox" data-mod="${m}" data-i="${i}"${(p.modificadores || []).includes(m) ? ' checked' : ''}> ${m}</label>`).join(' ')}`;
+      case 'esperar': return num('ms', 'Tempo', 'min="0" step="100"') + '<span class="item-sub">ms</span>';
+      case 'rolar': return num('quantidade', 'Cliques da rodinha', 'step="1"') + '<span class="item-sub">negativo desce</span>';
+      default: return '';
+    }
+  }
+
+  function desenhar() {
+    const lista = $('auto-passos');
+    if (!passos.length) { lista.innerHTML = '<li class="vazio">Nenhum passo ainda. Use os botões acima, ou aperte F8 com o mouse onde quer clicar.</li>'; return; }
+    lista.innerHTML = passos.map((p, i) => `<li class="step${i === selecionado ? ' sel' : ''}" data-tipo="${p.tipo}" data-i="${i}">
+      <span class="num"></span><span class="kind">${NOMES[p.tipo]}</span>
+      ${campos(p, i)}
+      <label>Espera depois <input type="number" data-campo="atraso" data-i="${i}" value="${p.atraso ?? ''}" placeholder="padrão" min="0" step="10" style="width:86px"></label>
+      <span class="acoes">
+        <button type="button" data-acao="cima" data-i="${i}" aria-label="Subir passo">↑</button>
+        <button type="button" data-acao="baixo" data-i="${i}" aria-label="Descer passo">↓</button>
+        <button type="button" data-acao="copiar" data-i="${i}" aria-label="Duplicar passo">⧉</button>
+        <button type="button" data-acao="apagar" data-i="${i}" aria-label="Remover passo">×</button>
+      </span>
+    </li>`).join('');
+  }
+
+  const guardarRascunho = () => { try { localStorage.setItem(RASCUNHO, JSON.stringify({ macroId, nome: $('auto-nome').value, passos, cfg: config() })); } catch {} };
+  const config = () => ({
+    repeticoes: Math.max(1, +$('auto-repeticoes').value || 1),
+    intervalo: Math.max(0, +$('auto-intervalo').value || 0),
+    atrasoPadrao: Math.max(0, +$('auto-atraso').value || 0),
+    esperaInicial: Math.max(0, +$('auto-inicio').value || 0),
+  });
+  function aplicarConfig(c = {}) {
+    $('auto-repeticoes').value = c.repeticoes ?? 1;
+    $('auto-intervalo').value = c.intervalo ?? 500;
+    $('auto-atraso').value = c.atrasoPadrao ?? 120;
+    $('auto-inicio').value = c.esperaInicial ?? 3000;
+  }
+
+  function mudou() { desenhar(); guardarRascunho(); }
+
+  $('auto-passos').addEventListener('click', e => {
+    const acao = e.target.closest('[data-acao]');
+    if (acao) {
+      const i = +acao.dataset.i;
+      const tipo = acao.dataset.acao;
+      if (tipo === 'apagar') passos.splice(i, 1);
+      if (tipo === 'copiar') passos.splice(i + 1, 0, structuredClone(passos[i]));
+      if (tipo === 'cima' && i > 0) passos.splice(i - 1, 0, passos.splice(i, 1)[0]);
+      if (tipo === 'baixo' && i < passos.length - 1) passos.splice(i + 1, 0, passos.splice(i, 1)[0]);
+      selecionado = -1;
+      mudou();
+      return;
+    }
+    const linha = e.target.closest('.step');
+    if (linha) { selecionado = +linha.dataset.i; desenhar(); }
+  });
+  $('auto-passos').addEventListener('input', e => {
+    const alvo = e.target, i = +alvo.dataset.i;
+    if (Number.isNaN(i)) return;
+    if (alvo.dataset.mod) {
+      const mods = new Set(passos[i].modificadores || []);
+      alvo.checked ? mods.add(alvo.dataset.mod) : mods.delete(alvo.dataset.mod);
+      passos[i].modificadores = [...mods];
+    } else if (alvo.dataset.campo) {
+      const campo = alvo.dataset.campo;
+      passos[i][campo] = alvo.type === 'number' ? (alvo.value === '' ? undefined : +alvo.value) : alvo.value;
+    }
+    guardarRascunho();
+  });
+  document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
+    passos.push(NOVO[b.dataset.add]());
+    selecionado = passos.length - 1;
+    mudou();
+  }));
+  document.querySelectorAll('.auto-config input').forEach(i => i.addEventListener('input', guardarRascunho));
+
+  // F8 em qualquer lugar da tela: marca a posição do mouse
+  window.ajAuto.onPosition(({ x, y }) => {
+    const p = passos[selecionado];
+    if (p && (p.tipo === 'clique' || p.tipo === 'mover')) { p.x = x; p.y = y; }
+    else { passos.push({ ...NOVO.clique(), x, y }); selecionado = passos.length - 1; }
+    mudou();
+    aviso(`Posição marcada: ${x}, ${y}`);
+  });
+
+  function aviso(texto, erro = false) {
+    const el = $('auto-status');
+    el.innerHTML = esc(texto);
+    el.classList.toggle('erro', erro);
+  }
+
+  // lista de automações salvas
+  async function recarregarLista(selecionar) {
+    const macros = await window.ajAuto.list();
+    $('auto-lista').innerHTML = `<option value="">— nova automação —</option>` + macros.map(m => `<option value="${esc(m.id)}"${m.id === selecionar ? ' selected' : ''}>${esc(m.nome || m.id)}</option>`).join('');
+    return macros;
+  }
+  $('auto-lista').addEventListener('change', async e => {
+    const id = e.target.value;
+    if (!id) { macroId = null; $('auto-nome').value = ''; passos = []; aplicarConfig(); mudou(); return; }
+    const macro = (await window.ajAuto.list()).find(m => m.id === id);
+    if (!macro) return;
+    macroId = macro.id;
+    $('auto-nome').value = macro.nome || '';
+    passos = macro.passos || [];
+    aplicarConfig(macro);
+    selecionado = -1;
+    mudou();
+  });
+  $('auto-novo').addEventListener('click', () => { macroId = null; $('auto-nome').value = ''; passos = []; selecionado = -1; $('auto-lista').value = ''; mudou(); });
+  $('auto-salvar').addEventListener('click', async () => {
+    const nome = $('auto-nome').value.trim() || 'Sem nome';
+    const salvo = await window.ajAuto.save({ id: macroId, nome, passos, ...config() });
+    macroId = salvo.id;
+    await recarregarLista(macroId);
+    aviso(`Salvo: ${nome}`);
+  });
+  $('auto-apagar').addEventListener('click', async () => {
+    if (!macroId) return;
+    await window.ajAuto.remove(macroId);
+    macroId = null; $('auto-nome').value = ''; passos = []; mudou();
+    await recarregarLista();
+    aviso('Automação apagada.');
+  });
+
+  // rodar e parar
+  $('auto-rodar').addEventListener('click', async () => {
+    try {
+      await window.ajAuto.run({ passos, ...config() });
+    } catch (err) { aviso(String(err.message || err), true); }
+  });
+  $('auto-parar').addEventListener('click', () => window.ajAuto.stop());
+
+  window.ajAuto.onEvent(evento => {
+    if (evento.tipo === 'inicio') {
+      rodando = true;
+      $('auto-rodar').disabled = true; $('auto-parar').disabled = false;
+      aviso(`Rodando ${evento.passos} passos, ${evento.repeticoes}× · F9 para parar`);
+    } else if (evento.tipo === 'passo') {
+      document.querySelectorAll('.step.agora').forEach(el => el.classList.remove('agora'));
+      document.querySelector(`.step[data-i="${evento.passo - 1}"]`)?.classList.add('agora');
+    } else if (evento.tipo === 'volta') {
+      aviso(`Volta ${evento.volta} terminada`);
+    } else if (evento.tipo === 'erro') {
+      aviso(`Erro: ${evento.mensagem}`, true);
+    } else if (evento.tipo === 'fim') {
+      aviso('Terminou.');
+    } else if (evento.tipo === 'parou') {
+      rodando = false;
+      $('auto-rodar').disabled = false; $('auto-parar').disabled = true;
+      document.querySelectorAll('.step.agora').forEach(el => el.classList.remove('agora'));
+    }
+  });
+
+  // troca de abas
+  const tabs = $('tabs');
+  tabs.hidden = false;
+  tabs.addEventListener('click', e => {
+    const botao = e.target.closest('[data-tab]');
+    if (botao) abrirAba(botao.dataset.tab);
+  });
+  function abrirAba(qual) {
+    for (const b of tabs.children) b.setAttribute('aria-selected', String(b.dataset.tab === qual));
+    $('painel-trocas').hidden = qual !== 'trocas';
+    $('painel-auto').hidden = qual !== 'auto';
+    document.querySelector('h1').textContent = TITULOS[qual][0];
+    document.querySelector('.lede').textContent = TITULOS[qual][1];
+    document.querySelector('.source').hidden = qual !== 'trocas';
+    window.ajAuto.hotkeys(qual === 'auto');
+    try { localStorage.setItem('aj-aba', qual); } catch {}
+  }
+
+  // estado inicial
+  try {
+    const rascunho = JSON.parse(localStorage.getItem(RASCUNHO) || 'null');
+    if (rascunho) { macroId = rascunho.macroId || null; $('auto-nome').value = rascunho.nome || ''; passos = rascunho.passos || []; aplicarConfig(rascunho.cfg); }
+  } catch {}
+  desenhar();
+  recarregarLista(macroId);
+  let abaInicial = 'trocas';
+  try { abaInicial = localStorage.getItem('aj-aba') || 'trocas'; } catch {}
+  abrirAba(abaInicial);
+})();
+</script>
 
 <script src="items.js"></script>
 <script>

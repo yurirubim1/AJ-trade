@@ -1,11 +1,12 @@
 // AJ Trade Value — processo principal do aplicativo.
 // Abre a janela, serve os arquivos do site por um protocolo próprio (aj://) e
 // atualiza os valores do wiki uma vez por dia.
-import { app, BrowserWindow, Menu, ipcMain, protocol, net, shell, dialog } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, protocol, net, shell, dialog, globalShortcut, screen } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { runUpdate } from './update.mjs';
+import { Macros } from './macros.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const userDir = app.getPath('userData');
@@ -24,6 +25,18 @@ const writeConfig = cfg => { try { fs.mkdirSync(userDir, { recursive: true }); f
 let win = null;
 let status = { state: 'idle', step: '', pct: 0, updatedAt: readConfig().lastUpdate || null };
 let updating = null;
+let macros = null;
+
+// Aba Automação: F8 marca a posição do mouse, F9 para tudo. Só ficam ligados com a aba aberta.
+function setHotkeys(on) {
+  globalShortcut.unregisterAll();
+  if (!on) return;
+  globalShortcut.register('F8', () => {
+    const ponto = screen.dipToScreenPoint(screen.getCursorScreenPoint()); // pixels de verdade, como o runner usa
+    win?.webContents.send('aj:auto-position', { x: Math.round(ponto.x), y: Math.round(ponto.y) });
+  });
+  globalShortcut.register('F9', () => { if (macros?.running) macros.stop(); });
+}
 
 function setStatus(next) {
   status = { ...status, ...next };
@@ -124,7 +137,20 @@ function createWindow() {
   // AJ_SHOT=caminho.png abre, fotografa a janela e fecha — usado para conferir o aplicativo sem abrir na mão.
   if (process.env.AJ_SHOT) {
     win.webContents.once('did-finish-load', () => setTimeout(async () => {
-      fs.writeFileSync(process.env.AJ_SHOT, (await win.webContents.capturePage()).toPNG());
+      if (process.env.AJ_TAB) {
+        await win.webContents.executeJavaScript(`document.querySelector('[data-tab="${process.env.AJ_TAB}"]')?.click()`).catch(() => {});
+        await new Promise(r => setTimeout(r, 900));
+      }
+      for (const seletor of (process.env.AJ_CLICK || '').split(';').filter(Boolean)) {
+        await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(seletor)})?.click()`).catch(() => {});
+        await new Promise(r => setTimeout(r, Number(process.env.AJ_WAIT) || 900));
+      }
+      for (let tentativa = 0; tentativa < 3; tentativa++) {
+        win.show(); win.focus();
+        const png = (await win.webContents.capturePage()).toPNG();
+        if (png.length) { fs.writeFileSync(process.env.AJ_SHOT, png); break; }
+        await new Promise(r => setTimeout(r, 700));
+      }
       app.exit(0);
     }, 2500));
   }
@@ -145,6 +171,19 @@ else {
     app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
   });
   app.on('window-all-closed', () => app.quit());
+  app.on('will-quit', () => { globalShortcut.unregisterAll(); macros?.stop(); });
   ipcMain.handle('aj:update-now', () => update({ manual: true }));
   ipcMain.handle('aj:status', () => status);
+
+  macros = new Macros({ appRoot, userDir, onEvent: evento => win?.webContents.send('aj:auto-event', evento) });
+  ipcMain.handle('aj:auto-list', () => macros.list());
+  ipcMain.handle('aj:auto-save', (_e, macro) => macros.save(macro));
+  ipcMain.handle('aj:auto-delete', (_e, id) => macros.remove(id));
+  ipcMain.handle('aj:auto-run', (_e, plan) => macros.run(plan));
+  ipcMain.handle('aj:auto-stop', () => macros.stop());
+  ipcMain.handle('aj:auto-hotkeys', (_e, on) => setHotkeys(!!on));
+  ipcMain.handle('aj:auto-cursor', () => {
+    const ponto = screen.dipToScreenPoint(screen.getCursorScreenPoint());
+    return { x: Math.round(ponto.x), y: Math.round(ponto.y) };
+  });
 }

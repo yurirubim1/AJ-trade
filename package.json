@@ -1,6 +1,6 @@
 {
   "name": "aj-trade-value",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Calculadora de trocas do Animal Jam Classic com valores do AJ Item Worth Wiki",
   "author": "yurirubim1",
@@ -39,8 +39,8 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "AJ Trade Value",
-      "artifactName": "AJ-Trade-Value-instalador-${version}.exe"
+      "artifactName": "AJ-Trade-Value-instalador.exe"
     },
-    "portable": { "artifactName": "AJ-Trade-Value-${version}.exe" }
+    "portable": { "artifactName": "AJ-Trade-Value.exe" }
   }
 }

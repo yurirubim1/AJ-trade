@@ -14,6 +14,19 @@ Na primeira vez o Windows pode mostrar o aviso "Windows protegeu o computador", 
 
 Dentro do aplicativo, a barra no topo mostra quando os valores foram baixados e tem o botão **Atualizar agora** (ou tecla F5). A atualização leva menos de um minuto e acontece sozinha quando o aplicativo abre, se já passou um dia da última. Sem internet, o aplicativo continua funcionando com os valores que já tem.
 
+### Aba Automação
+
+O aplicativo tem uma segunda aba, para automatizar tarefas repetitivas no computador (editor, ferramenta de desenvolvimento, formulário). Nada a ver com o Animal Jam: é um utilitário à parte, na mesma janela.
+
+Passos disponíveis: **clique** (posição, botão, número de cliques), **mover mouse**, **escrever texto** (aceita acentos, com velocidade por letra), **tecla** (com Ctrl, Shift, Alt, Win), **esperar** e **rolagem**. Cada passo tem sua própria espera, e a automação inteira pode repetir quantas vezes quiser, com intervalo entre as voltas.
+
+- **F8**, em qualquer lugar da tela, marca a posição do mouse no passo escolhido. Sem passo escolhido, cria um clique novo ali.
+- **F9** para tudo na hora, mesmo com outro programa na frente.
+- A espera antes de começar (3 segundos por padrão) serve para você trocar de janela.
+- As automações ficam salvas por nome e o rascunho atual volta sozinho quando você reabre o app.
+
+Os cliques e teclas são enviados pelo Windows (`SendInput`) através de `app/runner.ps1`, num PowerShell separado — por isso o F9 consegue interromper na hora. Detalhes que importam: as teclas vão para a **janela que estiver em foco**, então confira qual janela está na frente antes de rodar; e programas abertos como administrador só recebem os comandos se o aplicativo também estiver como administrador.
+
 ## Como usar (versão site)
 
 Abra o `index.html` no navegador. Não precisa instalar nada.
@@ -94,6 +107,10 @@ scripts/lib/worth.mjs       converte "3 Good Long Wrists" etc. em diamantes
 scripts/lib/ptdict.mjs      nomes em português, gírias, cores e palavras para a busca
 scripts/lib/build.mjs       monta a base (categorias, códigos de pet)
 scripts/lib/photos.mjs      baixa as fotos e monta os sprites
+app/main.mjs                janela, menus, atalhos globais e atualização diária
+app/update.mjs              refaz a base de valores dentro do aplicativo
+app/macros.mjs              guarda e executa as automações
+app/runner.ps1              envia cliques, textos e teclas para o Windows
 ```
 
 Para adicionar gírias ou nomes em português, edite `PT_NAMES` e `ALIASES` em `scripts/lib/ptdict.mjs` (e `SLANG` no `index.html` para gírias que apontam para uma cor específica) e rode o script de novo.
