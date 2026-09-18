@@ -102,6 +102,8 @@ input[type="number"]{width:98px; font-variant-numeric:tabular-nums}
 .auto-status.gravando{color:var(--loss)}
 .btn.gravar{margin-left:auto; border-color:var(--loss); color:var(--loss)}
 .btn.gravar.ativo{background:var(--loss); border-color:var(--loss); color:#fff}
+.tecla-gravar{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--muted)}
+.tecla-gravar select{padding:5px 8px; font-size:13px}
 .auto-macros .fixo{display:inline-flex; align-items:center; gap:6px; text-transform:none; letter-spacing:0; font-size:13px; font-weight:700; color:var(--muted)}
 .step .marcar{border:1px solid var(--get); background:var(--get-soft); color:var(--get); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:800; white-space:nowrap}
 .step .marcar:hover{background:var(--get); color:#fff}
@@ -379,7 +381,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
 
   <section id="painel-auto" hidden aria-label="Automação">
     <div class="passo-a-passo">
-      <span><i>1</i> <b>Gravar</b> (ou Insert) anota tudo que você fizer; aperte Insert de novo para parar</span>
+      <span><i>1</i> <b>Gravar</b> (ou a tecla <b id="dica-tecla">Delete</b>) anota tudo que você fizer; aperte a mesma tecla para parar</span>
       <span><i>2</i> Ou monte na mão: cada botão acima vira um passo</span>
       <span><i>3</i> Em cliques, <b>Marcar posição</b> guarda onde o mouse estiver depois de 3 segundos</span>
       <span><i>4</i> <b>Rodar</b> executa tudo · <b>F9</b> para na hora</span>
@@ -398,9 +400,10 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       </div>
       <div class="auto-config">
         <label>Repetições <input id="auto-repeticoes" type="number" min="1" max="100000" value="1"></label>
-        <label>Intervalo entre voltas <input id="auto-intervalo" type="number" min="0" step="100" value="500"><span>ms</span></label>
-        <label>Espera entre passos <input id="auto-atraso" type="number" min="0" step="10" value="120"><span>ms</span></label>
-        <label>Espera antes de começar <input id="auto-inicio" type="number" min="0" step="500" value="3000"><span>ms</span></label>
+        <label>Tempos em <select id="auto-unidade"><option value="ms">milissegundos</option><option value="s">segundos</option></select></label>
+        <label>Intervalo entre voltas <input id="auto-intervalo" type="number" min="0" step="100" value="500"><span class="un">ms</span></label>
+        <label>Espera entre passos <input id="auto-atraso" type="number" min="0" step="10" value="120"><span class="un">ms</span></label>
+        <label>Espera antes de começar <input id="auto-inicio" type="number" min="0" step="500" value="3000"><span class="un">ms</span></label>
       </div>
     </div>
 
@@ -413,7 +416,8 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       <button class="btn" type="button" data-add="tecla">Tecla</button>
       <button class="btn" type="button" data-add="esperar">Esperar</button>
       <button class="btn" type="button" data-add="rolar">Rolagem</button>
-      <button class="btn gravar" type="button" id="auto-gravar">● Gravar o que eu fizer (Insert)</button>
+      <button class="btn gravar" type="button" id="auto-gravar">● Gravar o que eu fizer</button>
+      <label class="tecla-gravar">tecla: <select id="auto-tecla" title="Enquanto a aba estiver aberta, essa tecla fica reservada para gravar"></select></label>
     </div>
 
     <ol class="steps" id="auto-passos"></ol>
@@ -514,7 +518,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
           ${TECLAS.map(([grupo, teclas]) => `<optgroup label="${grupo}">${teclas.map(t => `<option value="${t}"${p.tecla === t ? ' selected' : ''}>${t === 'espaco' ? 'espaço' : t}</option>`).join('')}</optgroup>`).join('')}
         </select></label>
         <span class="junto">${['ctrl', 'shift', 'alt', 'win'].map(m => `<label><input type="checkbox" data-mod="${m}" data-i="${i}"${(p.modificadores || []).includes(m) ? ' checked' : ''}> ${m}</label>`).join('')}</span>`;
-      case 'esperar': return numero(p, 'ms', 'Tempo', i, 'min="0" step="100"') + '<span class="unidade">ms</span>';
+      case 'esperar': return `<label>Tempo <input type="number" data-campo="ms" data-tempo="1" data-i="${i}" value="${naTela(p.ms)}" min="0" step="${passoDoCampo(true)}"></label><span class="unidade">${unidade === 's' ? 'segundos' : 'ms'}</span>`;
       case 'rolar': return numero(p, 'quantidade', 'Rodinha', i, 'step="1"') + '<span class="unidade">negativo desce a tela</span>';
       default: return '';
     }
@@ -530,7 +534,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     lista.innerHTML = passos.map((p, i) => `<li class="step${i === selecionado ? ' sel' : ''}" data-tipo="${p.tipo}" data-i="${i}">
       <span class="num"></span><span class="kind">${NOMES[p.tipo]}</span>
       ${campos(p, i)}
-      ${p.tipo === 'esperar' ? '' : `<label class="depois" title="Tempo parado depois deste passo">depois, esperar <input type="number" data-campo="atraso" data-i="${i}" value="${p.atraso ?? ''}" placeholder="${padrao}" min="0" step="10"> ms</label>`}
+      ${p.tipo === 'esperar' ? '' : `<label class="depois" title="Tempo parado depois deste passo">depois, esperar <input type="number" data-campo="atraso" data-tempo="1" data-i="${i}" value="${p.atraso == null ? '' : naTela(p.atraso)}" placeholder="${naTela(padrao)}" min="0" step="${passoDoCampo(false)}"> ${unidade === 's' ? 's' : 'ms'}</label>`}
       <span class="acoes">
         <button type="button" data-acao="testar" data-i="${i}" title="Executar só este passo">▶</button>
         <button type="button" data-acao="cima" data-i="${i}" title="Subir">↑</button>
@@ -553,18 +557,36 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     setTimeout(() => el.classList.remove('piscar'), 700);
   }
 
+  // Por dentro tudo é milissegundo; a unidade escolhida vale só para o que aparece na tela.
+  let unidade = 'ms';
+  const emMs = valor => (unidade === 's' ? Math.round((+valor || 0) * 1000) : Math.round(+valor || 0));
+  const naTela = ms => (unidade === 's' ? +((+ms || 0) / 1000).toFixed(3) : Math.round(+ms || 0));
+  const passoDoCampo = grosso => (unidade === 's' ? '0.1' : grosso ? '100' : '10');
+
   const config = () => ({
     repeticoes: Math.max(1, +$('auto-repeticoes').value || 1),
-    intervalo: Math.max(0, +$('auto-intervalo').value || 0),
-    atrasoPadrao: Math.max(0, +$('auto-atraso').value || 0),
-    esperaInicial: Math.max(0, +$('auto-inicio').value || 0),
+    intervalo: Math.max(0, emMs($('auto-intervalo').value)),
+    atrasoPadrao: Math.max(0, emMs($('auto-atraso').value)),
+    esperaInicial: Math.max(0, emMs($('auto-inicio').value)),
+    unidade,
   });
   function aplicarConfig(c = {}) {
     $('auto-repeticoes').value = c.repeticoes ?? 1;
-    $('auto-intervalo').value = c.intervalo ?? 500;
-    $('auto-atraso').value = c.atrasoPadrao ?? 120;
-    $('auto-inicio').value = c.esperaInicial ?? 3000;
+    $('auto-intervalo').value = naTela(c.intervalo ?? 500);
+    $('auto-atraso').value = naTela(c.atrasoPadrao ?? 120);
+    $('auto-inicio').value = naTela(c.esperaInicial ?? 3000);
+    for (const [id, grosso] of [['auto-intervalo', true], ['auto-atraso', false], ['auto-inicio', true]]) $(id).step = passoDoCampo(grosso);
+    $('auto-unidade').value = unidade;
+    document.querySelectorAll('.auto-config .un').forEach(el => (el.textContent = unidade === 's' ? 's' : 'ms'));
   }
+  $('auto-unidade').addEventListener('change', e => {
+    const atual = config(); // lê em ms ainda com a unidade antiga
+    unidade = e.target.value === 's' ? 's' : 'ms';
+    aplicarConfig(atual);
+    render();
+    guardar();
+    aviso(`Agora os tempos aparecem em <b>${unidade === 's' ? 'segundos' : 'milissegundos'}</b>.`, 'ok');
+  });
   const guardar = () => { try { localStorage.setItem(RASCUNHO, JSON.stringify({ macroId, nome: $('auto-nome').value, passos, cfg: config() })); } catch {} };
 
   function aviso(texto, tipo = '') {
@@ -640,7 +662,8 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       passos[i].modificadores = [...mods];
     } else if (alvo.dataset.campo) {
       const campo = alvo.dataset.campo;
-      passos[i][campo] = alvo.type === 'number' ? (alvo.value === '' ? undefined : +alvo.value) : alvo.value;
+      if (alvo.dataset.tempo) passos[i][campo] = alvo.value === '' ? undefined : emMs(alvo.value);
+      else passos[i][campo] = alvo.type === 'number' ? (alvo.value === '' ? undefined : +alvo.value) : alvo.value;
     }
     guardar();
   });
@@ -660,7 +683,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   }));
   document.querySelectorAll('.auto-config input').forEach(i => i.addEventListener('input', () => {
     guardar();
-    if (i.id === 'auto-atraso') document.querySelectorAll('[data-campo="atraso"]').forEach(c => (c.placeholder = config().atrasoPadrao));
+    if (i.id === 'auto-atraso') document.querySelectorAll('[data-campo="atraso"]').forEach(c => (c.placeholder = naTela(config().atrasoPadrao)));
   }));
 
   window.ajAuto.onPosition(({ x, y }) => { // tecla F8
@@ -696,6 +719,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     macroId = macro.id;
     $('auto-nome').value = macro.nome || '';
     passos = macro.passos || [];
+    unidade = macro.unidade === 's' ? 's' : 'ms';
     aplicarConfig(macro);
     selecionado = -1;
     render(); guardar();
@@ -748,6 +772,22 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   $('auto-parar').addEventListener('click', () => window.ajAuto.stop());
 
   // ---------- gravar ----------
+  let teclaGravar = 'Delete';
+  function mostrarTecla(tecla) {
+    teclaGravar = tecla;
+    $('dica-tecla').textContent = tecla;
+    $('auto-tecla').value = tecla;
+    if (!$('auto-gravar').classList.contains('ativo')) $('auto-gravar').textContent = `● Gravar o que eu fizer (${tecla})`;
+  }
+  window.ajAuto.opcoes().then(({ teclaGravar: atual, teclas }) => {
+    $('auto-tecla').innerHTML = teclas.map(t => `<option value="${t}">${t}</option>`).join('');
+    mostrarTecla(atual);
+  });
+  $('auto-tecla').addEventListener('change', async e => {
+    const tecla = await window.ajAuto.definirTeclaGravar(e.target.value);
+    mostrarTecla(tecla);
+    aviso(`Agora a gravação liga e desliga com <b>${tecla}</b>. Enquanto esta aba estiver aberta, essa tecla não chega nos outros programas.`, 'ok');
+  });
   $('auto-gravar').addEventListener('click', () => window.ajAuto.record());
   $('auto-mini').addEventListener('click', () => window.ajAuto.mini(true));
   $('auto-topo').addEventListener('change', e => window.ajAuto.sempreEmCima(e.target.checked));
@@ -789,14 +829,16 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       rodando = false;
       $('auto-rodar').disabled = false; $('auto-parar').disabled = true;
       document.querySelectorAll('.step.agora').forEach(el => el.classList.remove('agora'));
+    } else if (evento.tipo === 'tecla-gravar') {
+      mostrarTecla(evento.tecla);
     } else if (evento.tipo === 'gravando') {
       $('auto-gravar').classList.add('ativo');
-      $('auto-gravar').textContent = '■ Parar a gravação (Insert)';
+      $('auto-gravar').textContent = `■ Parar a gravação (${teclaGravar})`;
       $('auto-rodar').disabled = true;
-      aviso(`Gravando tudo que você faz… <b>${evento.total}</b> ${evento.total === 1 ? 'ação' : 'ações'} · aperte <b>Insert</b> para parar`, 'gravando');
+      aviso(`Gravando tudo que você faz… <b>${evento.total}</b> ${evento.total === 1 ? 'ação' : 'ações'} · aperte <b>${teclaGravar}</b> para parar`, 'gravando');
     } else if (evento.tipo === 'gravado') {
       $('auto-gravar').classList.remove('ativo');
-      $('auto-gravar').textContent = '● Gravar o que eu fizer (Insert)';
+      $('auto-gravar').textContent = `● Gravar o que eu fizer (${teclaGravar})`;
       $('auto-rodar').disabled = false;
       receberGravacao(evento.passos);
     }
@@ -823,7 +865,13 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   // ---------- início ----------
   try {
     const rascunho = JSON.parse(localStorage.getItem(RASCUNHO) || 'null');
-    if (rascunho) { macroId = rascunho.macroId || null; $('auto-nome').value = rascunho.nome || ''; passos = rascunho.passos || []; aplicarConfig(rascunho.cfg); }
+    if (rascunho) {
+      macroId = rascunho.macroId || null;
+      $('auto-nome').value = rascunho.nome || '';
+      passos = rascunho.passos || [];
+      unidade = rascunho.cfg?.unidade === 's' ? 's' : 'ms';
+      aplicarConfig(rascunho.cfg);
+    }
   } catch {}
   render();
   dica();

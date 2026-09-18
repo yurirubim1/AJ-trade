@@ -44,14 +44,20 @@ button.gravar.ativo{background:var(--loss); color:#fff}
   <div class="botoes">
     <button class="acao rodar" id="rodar">▶ Rodar</button>
     <button class="acao parar" id="parar" disabled>■ Parar</button>
-    <button class="acao gravar" id="gravar">● Gravar (Insert)</button>
+    <button class="acao gravar" id="gravar">● Gravar</button>
   </div>
-  <div class="estado" id="estado">F9 para · Insert grava</div>
+  <div class="estado" id="estado">F9 para a automação</div>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
   const estado = (texto, tipo = '') => { $('estado').textContent = texto; $('estado').className = `estado ${tipo}`; };
-  let gravando = false, rodando = false;
+  let gravando = false, rodando = false, teclaGravar = 'Delete';
+  const rotuloGravar = () => `● Gravar (${teclaGravar})`;
+  window.ajAuto.opcoes().then(({ teclaGravar: atual }) => {
+    teclaGravar = atual;
+    if (!gravando) $('gravar').textContent = rotuloGravar();
+    estado(`F9 para · ${teclaGravar} grava`);
+  });
 
   async function carregar() {
     const macros = await window.ajAuto.list();
@@ -88,8 +94,11 @@ button.gravar.ativo{background:var(--loss); color:#fff}
     } else if (evento.tipo === 'gravando') {
       gravando = true; $('gravar').classList.add('ativo'); $('gravar').textContent = '■ Parar gravação';
       estado(`Gravando… ${evento.total} ações`, 'gravando');
+    } else if (evento.tipo === 'tecla-gravar') {
+      teclaGravar = evento.tecla;
+      if (!gravando) $('gravar').textContent = rotuloGravar();
     } else if (evento.tipo === 'gravado') {
-      gravando = false; $('gravar').classList.remove('ativo'); $('gravar').textContent = '● Gravar (Insert)';
+      gravando = false; $('gravar').classList.remove('ativo'); $('gravar').textContent = rotuloGravar();
       estado(`Gravado: ${evento.passos.length} passos (salve na janela grande)`, 'ok');
       carregar();
     }

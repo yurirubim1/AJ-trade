@@ -20,6 +20,8 @@ O aplicativo tem uma segunda aba, para automatizar tarefas repetitivas no comput
 
 Passos disponíveis: **clique** (posição, botão, número de cliques), **mover mouse**, **escrever texto** (aceita acentos, com velocidade por letra), **tecla** (com Ctrl, Shift, Alt, Win), **esperar** e **rolagem**. Cada passo tem sua própria espera, e a automação inteira pode repetir quantas vezes quiser, com intervalo entre as voltas.
 
+- **Gravar** (botão ou tecla **Delete**) anota os cliques, arrastos e teclas que você fizer e monta os passos sozinho; a mesma tecla encerra. Dá para trocar a tecla no seletor ao lado do botão (Delete, Insert, F7, F10, F12, Pause, Scroll Lock). Enquanto a aba estiver aberta, essa tecla fica reservada e não chega nos outros programas.
+- **Tempos em milissegundos ou segundos**, à sua escolha. Por dentro tudo continua guardado em milissegundos, então as automações salvas seguem valendo se você trocar a unidade.
 - **📍 Marcar posição** conta 3 segundos e guarda onde o mouse estiver — assim você não precisa adivinhar coordenada nem largar o mouse no lugar antes de clicar no botão.
 - **▶** em cada passo executa só aquele passo, para conferir antes de rodar a sequência inteira.
 - **F8**, em qualquer lugar da tela, marca a posição na hora, no passo escolhido. Sem passo escolhido, cria um clique novo ali.

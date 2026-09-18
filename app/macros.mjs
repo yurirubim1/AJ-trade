@@ -65,12 +65,14 @@ export class Macros {
     return true;
   }
 
-  stopRecording() {
+  // teclaIgnorar: a tecla que liga/desliga a gravação não deve virar um passo
+  stopRecording(teclaIgnorar = '') {
     if (!this.recorder) return [];
     const { proc, eventos } = this.recorder;
     this.recorder = null;
     execFile('taskkill', ['/pid', String(proc.pid), '/t', '/f'], () => {});
-    const passos = eventosParaPassos(eventos);
+    const limpos = teclaIgnorar ? eventos.filter(e => !(e.tipo === 'tecla' && e.tecla === teclaIgnorar)) : eventos;
+    const passos = eventosParaPassos(limpos);
     this.onEvent({ tipo: 'gravado', passos });
     return passos;
   }

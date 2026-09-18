@@ -40,8 +40,16 @@ function setHotkeys(on) {
     paraTodos('aj:auto-position', { x: Math.round(ponto.x), y: Math.round(ponto.y) });
   });
   globalShortcut.register('F9', () => { if (macros?.running) macros.stop(); });
-  globalShortcut.register('Insert', () => alternarGravacao());
+  globalShortcut.register(teclaGravar(), () => alternarGravacao());
 }
+
+// Tecla que liga e desliga a gravação. Enquanto a aba de automação (ou a janelinha)
+// está aberta, essa tecla fica reservada e não chega nos outros programas.
+const TECLAS_GRAVAR = ['Delete', 'Insert', 'F7', 'F10', 'F12', 'Pause', 'ScrollLock'];
+const teclaGravar = () => {
+  const escolhida = readConfig().teclaGravar;
+  return TECLAS_GRAVAR.includes(escolhida) ? escolhida : 'Delete';
+};
 
 const paraTodos = (canal, dados) => {
   for (const janela of [win, mini]) if (janela && !janela.isDestroyed()) janela.webContents.send(canal, dados);
@@ -49,7 +57,7 @@ const paraTodos = (canal, dados) => {
 
 function alternarGravacao() {
   if (!macros) return false;
-  if (macros.recording) { macros.stopRecording(); return false; }
+  if (macros.recording) { macros.stopRecording(teclaGravar().toLowerCase()); return false; }
   return macros.startRecording();
 }
 
@@ -226,12 +234,21 @@ else {
   ipcMain.handle('aj:auto-run', (_e, plan) => macros.run(plan));
   ipcMain.handle('aj:auto-stop', () => macros.stop());
   ipcMain.handle('aj:auto-hotkeys', (_e, on) => setHotkeys(!!on));
-  ipcMain.handle('aj:auto-record', (_e, ligar) => (ligar === undefined ? alternarGravacao() : (ligar ? macros.startRecording() : macros.stopRecording())));
+  ipcMain.handle('aj:auto-record', (_e, ligar) => (ligar === undefined ? alternarGravacao() : (ligar ? macros.startRecording() : macros.stopRecording(teclaGravar().toLowerCase()))));
   ipcMain.handle('aj:auto-recording', () => macros.recording);
   ipcMain.handle('aj:auto-run-id', (_e, id) => {
     const macro = macros.list().find(m => m.id === id);
     if (!macro) throw new Error('Automação não encontrada.');
     return macros.run(macro);
+  });
+  ipcMain.handle('aj:auto-opcoes', () => ({ teclaGravar: teclaGravar(), teclas: TECLAS_GRAVAR }));
+  ipcMain.handle('aj:auto-tecla-gravar', (_e, tecla) => {
+    const cfg = readConfig();
+    cfg.teclaGravar = TECLAS_GRAVAR.includes(tecla) ? tecla : 'Delete';
+    writeConfig(cfg);
+    if (hotkeysLigados) setHotkeys(true);
+    paraTodos('aj:auto-event', { tipo: 'tecla-gravar', tecla: cfg.teclaGravar });
+    return cfg.teclaGravar;
   });
   ipcMain.handle('aj:mini', (_e, abrir) => abrirMini(abrir));
   ipcMain.handle('aj:sempre-em-cima', (_e, ligar) => { win?.setAlwaysOnTop(!!ligar); return !!ligar; });

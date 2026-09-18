@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('ajAuto', {
   cursor: () => ipcRenderer.invoke('aj:auto-cursor'),
   runId: id => ipcRenderer.invoke('aj:auto-run-id', id),
   record: ligar => ipcRenderer.invoke('aj:auto-record', ligar),
+  opcoes: () => ipcRenderer.invoke('aj:auto-opcoes'),
+  definirTeclaGravar: tecla => ipcRenderer.invoke('aj:auto-tecla-gravar', tecla),
   isRecording: () => ipcRenderer.invoke('aj:auto-recording'),
   mini: abrir => ipcRenderer.invoke('aj:mini', abrir),
   sempreEmCima: ligar => ipcRenderer.invoke('aj:sempre-em-cima', ligar),
