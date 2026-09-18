@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld('ajAuto', {
   stop: () => ipcRenderer.invoke('aj:auto-stop'),
   hotkeys: on => ipcRenderer.invoke('aj:auto-hotkeys', on),
   cursor: () => ipcRenderer.invoke('aj:auto-cursor'),
+  runId: id => ipcRenderer.invoke('aj:auto-run-id', id),
+  record: ligar => ipcRenderer.invoke('aj:auto-record', ligar),
+  isRecording: () => ipcRenderer.invoke('aj:auto-recording'),
+  mini: abrir => ipcRenderer.invoke('aj:mini', abrir),
+  sempreEmCima: ligar => ipcRenderer.invoke('aj:sempre-em-cima', ligar),
   onEvent: callback => ipcRenderer.on('aj:auto-event', (_event, evento) => callback(evento)),
   onPosition: callback => ipcRenderer.on('aj:auto-position', (_event, ponto) => callback(ponto)),
 });

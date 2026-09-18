@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 
 Add-Type -TypeDefinition @'
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -30,6 +31,10 @@ public static class Entrada
     [DllImport("user32.dll", SetLastError = true)] private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
     [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] private static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] private static extern short VkKeyScanEx(char ch, IntPtr dwhkl);
+    [DllImport("user32.dll")] private static extern IntPtr GetKeyboardLayout(uint idThread);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
 
     private const uint INPUT_MOUSE = 0;
     private const uint INPUT_KEYBOARD = 1;
@@ -64,6 +69,10 @@ public static class Entrada
 
     public static void Mover(int x, int y) { SetCursorPos(x, y); }
 
+    // Segurar por alguns milissegundos faz o clique/tecla ser aceito por programas
+    // que ignoram toques instantâneos (e deixa a gravação conseguir enxergá-los).
+    private const int PRESSAO = 25;
+
     public static void Clique(string botao, int vezes, int intervalo)
     {
         uint baixo = MOUSEEVENTF_LEFTDOWN, cima = MOUSEEVENTF_LEFTUP;
@@ -71,28 +80,73 @@ public static class Entrada
         else if (botao == "meio") { baixo = MOUSEEVENTF_MIDDLEDOWN; cima = MOUSEEVENTF_MIDDLEUP; }
         for (int n = 0; n < vezes; n++)
         {
-            Enviar(new INPUT[] { Mouse(baixo, 0), Mouse(cima, 0) });
+            Enviar(new INPUT[] { Mouse(baixo, 0) });
+            Thread.Sleep(PRESSAO);
+            Enviar(new INPUT[] { Mouse(cima, 0) });
             if (n + 1 < vezes) Thread.Sleep(intervalo);
         }
     }
 
     public static void Rolar(int cliques) { Enviar(new INPUT[] { Mouse(MOUSEEVENTF_WHEEL, unchecked((uint)(cliques * 120))) }); }
 
-    public static void Atalho(ushort[] modificadores, ushort tecla)
+    // Segura o botão, arrasta em pequenos passos (senão muitos programas ignoram) e solta.
+    public static void Arrastar(int x1, int y1, int x2, int y2, string botao)
     {
-        foreach (ushort m in modificadores) Enviar(new INPUT[] { Tecla(m, 0, 0) });
-        if (tecla != 0) Enviar(new INPUT[] { Tecla(tecla, 0, 0), Tecla(tecla, 0, KEYEVENTF_KEYUP) });
-        for (int i = modificadores.Length - 1; i >= 0; i--) Enviar(new INPUT[] { Tecla(modificadores[i], 0, KEYEVENTF_KEYUP) });
+        uint baixo = MOUSEEVENTF_LEFTDOWN, cima = MOUSEEVENTF_LEFTUP;
+        if (botao == "direito") { baixo = MOUSEEVENTF_RIGHTDOWN; cima = MOUSEEVENTF_RIGHTUP; }
+        else if (botao == "meio") { baixo = MOUSEEVENTF_MIDDLEDOWN; cima = MOUSEEVENTF_MIDDLEUP; }
+        SetCursorPos(x1, y1);
+        Thread.Sleep(60);
+        Enviar(new INPUT[] { Mouse(baixo, 0) });
+        const int partes = 24;
+        for (int i = 1; i <= partes; i++)
+        {
+            SetCursorPos(x1 + (x2 - x1) * i / partes, y1 + (y2 - y1) * i / partes);
+            Thread.Sleep(12);
+        }
+        Thread.Sleep(60);
+        Enviar(new INPUT[] { Mouse(cima, 0) });
     }
 
-    // Digita qualquer caractere (inclusive acentos) sem depender do layout do teclado.
+    public static void Atalho(ushort[] modificadores, ushort tecla)
+    {
+        foreach (ushort m in modificadores) { Enviar(new INPUT[] { Tecla(m, 0, 0) }); Thread.Sleep(10); }
+        if (tecla != 0)
+        {
+            Enviar(new INPUT[] { Tecla(tecla, 0, 0) });
+            Thread.Sleep(PRESSAO);
+            Enviar(new INPUT[] { Tecla(tecla, 0, KEYEVENTF_KEYUP) });
+        }
+        for (int i = modificadores.Length - 1; i >= 0; i--) { Thread.Sleep(10); Enviar(new INPUT[] { Tecla(modificadores[i], 0, KEYEVENTF_KEYUP) }); }
+    }
+
+    // Digita como se fosse o teclado de verdade: descobre qual tecla (e se precisa de Shift
+    // ou AltGr) produz cada letra no layout de quem está na frente. Programas que ignoram
+    // texto "injetado" — navegadores e jogos, por exemplo — aceitam assim.
     public static void Texto(string texto, int atrasoPorLetra)
     {
+        IntPtr layout = GetKeyboardLayout(GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero));
         foreach (char c in texto)
         {
             if (c == '\n' || c == '\r') { Atalho(new ushort[0], 0x0D); continue; }
-            Enviar(new INPUT[] { Tecla(0, c, KEYEVENTF_UNICODE), Tecla(0, c, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP) });
-            if (atrasoPorLetra > 0) Thread.Sleep(atrasoPorLetra);
+            short achada = VkKeyScanEx(c, layout);
+            if (achada != -1)
+            {
+                ushort vk = (ushort)(achada & 0xFF);
+                int estado = (achada >> 8) & 0xFF;
+                List<ushort> mods = new List<ushort>();
+                if ((estado & 1) != 0) mods.Add(0x10);  // shift
+                if ((estado & 2) != 0) mods.Add(0x11);  // ctrl
+                if ((estado & 4) != 0) mods.Add(0x12);  // alt
+                Atalho(mods.ToArray(), vk);
+            }
+            else // letra que não existe no teclado atual: manda como caractere solto
+            {
+                Enviar(new INPUT[] { Tecla(0, c, KEYEVENTF_UNICODE) });
+                Thread.Sleep(15);
+                Enviar(new INPUT[] { Tecla(0, c, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP) });
+            }
+            Thread.Sleep(atrasoPorLetra > 0 ? atrasoPorLetra : 10);
         }
     }
 }
@@ -123,7 +177,10 @@ $atrasoPadrao = if ($dados.atrasoPadrao) { [int]$dados.atrasoPadrao } else { 120
 $repeticoes = if ($dados.repeticoes) { [int]$dados.repeticoes } else { 1 }
 $intervalo = if ($dados.intervalo) { [int]$dados.intervalo } else { 0 }
 
-if ($dados.esperaInicial -gt 0) { Start-Sleep -Milliseconds ([int]$dados.esperaInicial) }
+# Sempre uma folga antes do primeiro comando: quando este processo abre, o Windows
+# leva um instante para devolver o foco à janela em que a automação deve agir.
+$esperaInicial = if ($dados.esperaInicial) { [int]$dados.esperaInicial } else { 0 }
+Start-Sleep -Milliseconds ([Math]::Max(350, $esperaInicial))
 
 try {
   for ($volta = 1; $volta -le $repeticoes; $volta++) {
@@ -144,6 +201,10 @@ try {
           $mods = @()
           foreach ($m in @($passo.modificadores)) { if ($m -and $MODIFICADORES.ContainsKey([string]$m)) { $mods += [uint16]$MODIFICADORES[[string]$m] } }
           [Entrada]::Atalho([uint16[]]$mods, (Resolver-Tecla ([string]$passo.tecla)))
+        }
+        'arrastar' {
+          $botao = if ($passo.botao) { [string]$passo.botao } else { 'esquerdo' }
+          [Entrada]::Arrastar([int]$passo.x, [int]$passo.y, [int]$passo.x2, [int]$passo.y2, $botao)
         }
         'rolar'   { [Entrada]::Rolar([int]$passo.quantidade) }
         'esperar' { Start-Sleep -Milliseconds ([int]$passo.ms) }

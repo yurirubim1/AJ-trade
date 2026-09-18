@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>AJ Trade Value</title>
+<style>
+:root{
+  --ground:#E9F0E6; --surface:#FFFFFF; --ink:#15241D; --muted:#56675E; --line:#D2DDD0;
+  --get:#12707C; --get-soft:#DBF0F2; --loss:#C2352B; --loss-soft:#FBE2DF; --win:#12864F; --fair:#5B4CC4;
+  --display:"Lilita One","Arial Rounded MT Bold","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ground:#0C1511; --surface:#14201A; --ink:#E3EEE7; --muted:#93A69B; --line:#27382F;
+  --get:#4CC3CF; --get-soft:#0F2D31; --loss:#FF7B70; --loss-soft:#3A1916; --win:#46D08D; --fair:#A99CFF;
+  color-scheme:dark;
+}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ground); color:var(--ink); font:400 13px/1.35 var(--body); padding:10px; display:flex; flex-direction:column; gap:8px; -webkit-app-region:drag}
+button,select{font:inherit; color:inherit; -webkit-app-region:no-drag}
+button{cursor:pointer}
+.topo{display:flex; align-items:center; gap:6px; font:400 14px/1 var(--display); color:var(--muted)}
+.topo b{color:var(--ink); font-weight:400}
+.topo .expandir{margin-left:auto; border:0; background:transparent; color:var(--muted); font-size:15px; padding:2px 6px; border-radius:6px}
+.topo .expandir:hover{background:var(--surface); color:var(--ink)}
+select{width:100%; padding:7px 9px; border-radius:9px; border:1px solid var(--line); background:var(--surface)}
+.botoes{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+button.acao{border:1px solid var(--line); background:var(--surface); border-radius:10px; padding:9px 6px; font-weight:800; font-size:13px}
+button.acao:hover{border-color:var(--get)}
+button.acao[disabled]{opacity:.45; cursor:default}
+button.rodar{background:var(--get); border-color:var(--get); color:#fff}
+button.parar{background:var(--loss-soft); border-color:var(--loss-soft); color:var(--loss)}
+button.gravar{grid-column:1 / -1; border-color:var(--loss); color:var(--loss)}
+button.gravar.ativo{background:var(--loss); color:#fff}
+.estado{font-size:12px; font-weight:700; color:var(--muted); min-height:32px; display:flex; align-items:center}
+.estado.rodando{color:var(--get)} .estado.gravando{color:var(--loss)} .estado.ok{color:var(--win)} .estado.erro{color:var(--loss)}
+</style>
+</head>
+<body>
+  <div class="topo"><b>AJ Trade Value</b><button class="expandir" id="expandir" title="Voltar para a janela grande">⤢</button></div>
+  <select id="lista" aria-label="Automação"></select>
+  <div class="botoes">
+    <button class="acao rodar" id="rodar">▶ Rodar</button>
+    <button class="acao parar" id="parar" disabled>■ Parar</button>
+    <button class="acao gravar" id="gravar">● Gravar (Insert)</button>
+  </div>
+  <div class="estado" id="estado">F9 para · Insert grava</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const estado = (texto, tipo = '') => { $('estado').textContent = texto; $('estado').className = `estado ${tipo}`; };
+  let gravando = false, rodando = false;
+
+  async function carregar() {
+    const macros = await window.ajAuto.list();
+    const guardada = localStorage.getItem('aj-mini-macro');
+    $('lista').innerHTML = macros.length
+      ? macros.map(m => `<option value="${m.id}"${m.id === guardada ? ' selected' : ''}>${m.nome || m.id}</option>`).join('')
+      : '<option value="">nenhuma automação salva</option>';
+  }
+  $('lista').addEventListener('change', e => { try { localStorage.setItem('aj-mini-macro', e.target.value); } catch {} });
+
+  $('rodar').addEventListener('click', async () => {
+    const id = $('lista').value;
+    if (!id) { estado('Salve uma automação na janela grande primeiro.', 'erro'); return; }
+    try { await window.ajAuto.runId(id); } catch (err) { estado(String(err.message || err), 'erro'); }
+  });
+  $('parar').addEventListener('click', () => window.ajAuto.stop());
+  $('gravar').addEventListener('click', () => window.ajAuto.record());
+  $('expandir').addEventListener('click', () => window.ajAuto.mini(false));
+
+  window.ajAuto.onEvent(evento => {
+    if (evento.tipo === 'inicio') {
+      rodando = true; $('rodar').disabled = true; $('parar').disabled = false;
+      estado(`Rodando ${evento.passos} passos, ${evento.repeticoes}×`, 'rodando');
+    } else if (evento.tipo === 'passo') {
+      estado(`Passo ${evento.passo}`, 'rodando');
+    } else if (evento.tipo === 'volta') {
+      estado(`Volta ${evento.volta} ok`, 'rodando');
+    } else if (evento.tipo === 'fim') {
+      estado('Terminou.', 'ok');
+    } else if (evento.tipo === 'erro') {
+      estado(evento.mensagem, 'erro');
+    } else if (evento.tipo === 'parou') {
+      rodando = false; $('rodar').disabled = false; $('parar').disabled = true;
+    } else if (evento.tipo === 'gravando') {
+      gravando = true; $('gravar').classList.add('ativo'); $('gravar').textContent = '■ Parar gravação';
+      estado(`Gravando… ${evento.total} ações`, 'gravando');
+    } else if (evento.tipo === 'gravado') {
+      gravando = false; $('gravar').classList.remove('ativo'); $('gravar').textContent = '● Gravar (Insert)';
+      estado(`Gravado: ${evento.passos.length} passos (salve na janela grande)`, 'ok');
+      carregar();
+    }
+  });
+
+  carregar();
+})();
+</script>
+</body>
+</html>

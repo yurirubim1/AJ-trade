@@ -7,15 +7,72 @@ import { spawn, execFile } from 'child_process';
 
 const POWERSHELL = `${process.env.SystemRoot || 'C:\\Windows'}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`;
 
+// Junta o que o gravador viu num roteiro de passos: letras seguidas viram um texto só,
+// e as pausas entre as ações viram passos de espera.
+export function eventosParaPassos(eventos, { pausaMinima = 300 } = {}) {
+  const passos = [];
+  let anterior = null, texto = null;
+  const fecharTexto = () => { if (texto) { passos.push({ tipo: 'texto', texto: texto.valor, atrasoPorLetra: 0, atraso: 0 }); texto = null; } };
+  for (const e of eventos) {
+    const pausa = anterior == null ? 0 : e.t - anterior;
+    if (e.tipo === 'letra' && texto && pausa < 1500) { texto.valor += e.c; anterior = e.t; continue; }
+    fecharTexto();
+    if (pausa >= pausaMinima) passos.push({ tipo: 'esperar', ms: Math.round(pausa / 50) * 50 });
+    if (e.tipo === 'letra') texto = { valor: e.c };
+    else if (e.tipo === 'clique') passos.push({ tipo: 'clique', x: e.x, y: e.y, botao: e.botao, vezes: 1, atraso: 0 });
+    else if (e.tipo === 'arrastar') passos.push({ tipo: 'arrastar', x: e.x, y: e.y, x2: e.x2, y2: e.y2, botao: e.botao, atraso: 0 });
+    else if (e.tipo === 'tecla') passos.push({ tipo: 'tecla', tecla: e.tecla, modificadores: e.mods || [], atraso: 0 });
+    anterior = e.t;
+  }
+  fecharTexto();
+  return passos;
+}
+
 export class Macros {
   constructor({ appRoot, userDir, onEvent }) {
     this.runnerSource = path.join(appRoot, 'app', 'runner.ps1');
+    this.recorderSource = path.join(appRoot, 'app', 'recorder.ps1');
     this.dir = path.join(userDir, 'macros');
     this.runDir = path.join(userDir, 'execucao');
     this.onEvent = onEvent;
     this.child = null;
+    this.recorder = null;
     fs.mkdirSync(this.dir, { recursive: true });
     fs.mkdirSync(this.runDir, { recursive: true });
+  }
+
+  get recording() { return !!this.recorder; }
+
+  startRecording() {
+    if (this.recorder || this.child) return false;
+    const script = path.join(this.runDir, 'recorder.ps1');
+    fs.writeFileSync(script, fs.readFileSync(this.recorderSource));
+    const eventos = [];
+    const proc = spawn(POWERSHELL, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { windowsHide: true });
+    this.recorder = { proc, eventos };
+    let buffer = '';
+    proc.stdout.on('data', chunk => {
+      buffer += chunk.toString('utf8');
+      const linhas = buffer.split(/\r?\n/);
+      buffer = linhas.pop() || '';
+      for (const linha of linhas.map(l => l.trim()).filter(Boolean)) {
+        try { eventos.push(JSON.parse(linha)); } catch { continue; }
+        this.onEvent({ tipo: 'gravando', total: eventos.length });
+      }
+    });
+    proc.on('close', () => { this.recorder = null; });
+    this.onEvent({ tipo: 'gravando', total: 0 });
+    return true;
+  }
+
+  stopRecording() {
+    if (!this.recorder) return [];
+    const { proc, eventos } = this.recorder;
+    this.recorder = null;
+    execFile('taskkill', ['/pid', String(proc.pid), '/t', '/f'], () => {});
+    const passos = eventosParaPassos(eventos);
+    this.onEvent({ tipo: 'gravado', passos });
+    return passos;
   }
 
   list() {

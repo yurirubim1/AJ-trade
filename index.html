@@ -99,6 +99,10 @@ input[type="number"]{width:98px; font-variant-numeric:tabular-nums}
 .auto-status.ok{color:var(--win)}
 .auto-status.contando{color:var(--fair); font-size:15px}
 .auto-status.rodando{color:var(--get)}
+.auto-status.gravando{color:var(--loss)}
+.btn.gravar{margin-left:auto; border-color:var(--loss); color:var(--loss)}
+.btn.gravar.ativo{background:var(--loss); border-color:var(--loss); color:#fff}
+.auto-macros .fixo{display:inline-flex; align-items:center; gap:6px; text-transform:none; letter-spacing:0; font-size:13px; font-weight:700; color:var(--muted)}
 .step .marcar{border:1px solid var(--get); background:var(--get-soft); color:var(--get); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:800; white-space:nowrap}
 .step .marcar:hover{background:var(--get); color:#fff}
 .step .marcar[disabled]{opacity:.45; cursor:default}
@@ -375,9 +379,9 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
 
   <section id="painel-auto" hidden aria-label="Automação">
     <div class="passo-a-passo">
-      <span><i>1</i> Adicione os passos na ordem</span>
-      <span><i>2</i> Em cliques, use <b>Marcar posição</b> e leve o mouse ao lugar certo</span>
-      <span><i>3</i> Teste um passo sozinho no <b>▶</b> da direita</span>
+      <span><i>1</i> <b>Gravar</b> (ou Insert) anota tudo que você fizer; aperte Insert de novo para parar</span>
+      <span><i>2</i> Ou monte na mão: cada botão acima vira um passo</span>
+      <span><i>3</i> Em cliques, <b>Marcar posição</b> guarda onde o mouse estiver depois de 3 segundos</span>
       <span><i>4</i> <b>Rodar</b> executa tudo · <b>F9</b> para na hora</span>
     </div>
 
@@ -389,6 +393,8 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
         <button class="btn" type="button" id="auto-novo">Nova</button>
         <button class="btn" type="button" id="auto-salvar">Salvar</button>
         <button class="btn" type="button" id="auto-apagar">Apagar</button>
+        <button class="btn" type="button" id="auto-mini" title="Janelinha por cima dos outros programas">⤡ Janela pequena</button>
+        <label class="fixo"><input type="checkbox" id="auto-topo"> sempre por cima</label>
       </div>
       <div class="auto-config">
         <label>Repetições <input id="auto-repeticoes" type="number" min="1" max="100000" value="1"></label>
@@ -401,11 +407,13 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     <div class="auto-add">
       <span>Adicionar passo:</span>
       <button class="btn" type="button" data-add="clique">Clique</button>
+      <button class="btn" type="button" data-add="arrastar">Arrastar</button>
       <button class="btn" type="button" data-add="mover">Mover mouse</button>
       <button class="btn" type="button" data-add="texto">Escrever texto</button>
       <button class="btn" type="button" data-add="tecla">Tecla</button>
       <button class="btn" type="button" data-add="esperar">Esperar</button>
       <button class="btn" type="button" data-add="rolar">Rolagem</button>
+      <button class="btn gravar" type="button" id="auto-gravar">● Gravar o que eu fizer (Insert)</button>
     </div>
 
     <ol class="steps" id="auto-passos"></ol>
@@ -463,9 +471,10 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     trocas: ['Vale a troca?', 'Coloque até 4 itens de cada lado, igual à janela de troca do Animal Jam Classic. A balança mostra quem sai ganhando.'],
     auto: ['Automação', 'Monte uma sequência de cliques, textos e teclas e deixe o computador repetir para você. Serve para qualquer programa: editor, jogo em teste, formulário.'],
   };
-  const NOMES = { clique: 'Clicar', mover: 'Mover mouse', texto: 'Escrever', tecla: 'Tecla', esperar: 'Esperar', rolar: 'Rolagem' };
+  const NOMES = { clique: 'Clicar', arrastar: 'Arrastar', mover: 'Mover mouse', texto: 'Escrever', tecla: 'Tecla', esperar: 'Esperar', rolar: 'Rolagem' };
   const NOVO = {
     clique: () => ({ tipo: 'clique', x: 0, y: 0, botao: 'esquerdo', vezes: 1 }),
+    arrastar: () => ({ tipo: 'arrastar', x: 0, y: 0, x2: 0, y2: 0, botao: 'esquerdo' }),
     mover: () => ({ tipo: 'mover', x: 0, y: 0 }),
     texto: () => ({ tipo: 'texto', texto: '', atrasoPorLetra: 0 }),
     tecla: () => ({ tipo: 'tecla', tecla: 'enter', modificadores: [] }),
@@ -489,12 +498,16 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     `<label title="${esc(rotulo)}">${rotulo} <input type="number" data-campo="${campo}" data-i="${i}" value="${esc(p[campo] ?? 0)}" ${extra}></label>`;
 
   function campos(p, i) {
-    const marcar = `<button type="button" class="marcar" data-marcar="${i}" title="Conta 3 segundos e guarda onde o mouse estiver">📍 Marcar posição</button>`;
+    const marcar = (alvo = '', rotulo = 'Marcar posição') =>
+      `<button type="button" class="marcar" data-marcar="${i}" data-alvo="${alvo}" title="Conta 3 segundos e guarda onde o mouse estiver">📍 ${rotulo}</button>`;
     switch (p.tipo) {
-      case 'clique': return `${numero(p, 'x', 'X', i)} ${numero(p, 'y', 'Y', i)} ${marcar}
+      case 'arrastar': return `${numero(p, 'x', 'De X', i)} ${numero(p, 'y', 'Y', i)} ${marcar('', 'Marcar início')}
+        ${numero(p, 'x2', 'até X', i)} ${numero(p, 'y2', 'Y', i)} ${marcar('2', 'Marcar fim')}
+        <label>Botão <select data-campo="botao" data-i="${i}">${['esquerdo', 'direito', 'meio'].map(b => `<option${p.botao === b ? ' selected' : ''}>${b}</option>`).join('')}</select></label>`;
+      case 'clique': return `${numero(p, 'x', 'X', i)} ${numero(p, 'y', 'Y', i)} ${marcar()}
         <label>Botão <select data-campo="botao" data-i="${i}">${['esquerdo', 'direito', 'meio'].map(b => `<option${p.botao === b ? ' selected' : ''}>${b}</option>`).join('')}</select></label>
         ${numero(p, 'vezes', 'Vezes', i, 'min="1" max="20"')}`;
-      case 'mover': return `${numero(p, 'x', 'X', i)} ${numero(p, 'y', 'Y', i)} ${marcar}`;
+      case 'mover': return `${numero(p, 'x', 'X', i)} ${numero(p, 'y', 'Y', i)} ${marcar()}`;
       case 'texto': return `<input class="grow" type="text" data-campo="texto" data-i="${i}" value="${esc(p.texto)}" placeholder="o que será digitado">
         ${numero(p, 'atrasoPorLetra', 'ms por letra', i, 'min="0" step="10"')}`;
       case 'tecla': return `<label>Tecla <select data-campo="tecla" data-i="${i}">
@@ -562,7 +575,8 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   const dica = () => aviso('Dica: escolha um passo e aperte <b>F8</b> para guardar onde o mouse está. <b>F9</b> para tudo.');
 
   // ---------- marcar posição ----------
-  async function marcarPosicao(i) {
+  const ACEITA_POSICAO = new Set(['clique', 'mover', 'arrastar']);
+  async function marcarPosicao(i, alvo = '') {
     if (capturando || rodando) return;
     capturando = true;
     document.querySelectorAll('.marcar').forEach(b => (b.disabled = true));
@@ -572,11 +586,12 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
         await espera(1000);
       }
       const { x, y } = await window.ajAuto.cursor();
-      if (i >= 0 && passos[i] && (passos[i].tipo === 'clique' || passos[i].tipo === 'mover')) {
-        passos[i].x = x; passos[i].y = y;
+      if (i >= 0 && passos[i] && ACEITA_POSICAO.has(passos[i].tipo)) {
+        const campoX = `x${alvo}`, campoY = `y${alvo}`;
+        passos[i][campoX] = x; passos[i][campoY] = y;
         const el = linha(i);
-        el.querySelector('[data-campo="x"]').value = x;
-        el.querySelector('[data-campo="y"]').value = y;
+        el.querySelector(`[data-campo="${campoX}"]`).value = x;
+        el.querySelector(`[data-campo="${campoY}"]`).value = y;
         piscar(i);
       } else {
         passos.push({ ...NOVO.clique(), x, y });
@@ -595,7 +610,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   // ---------- eventos da lista ----------
   $('auto-passos').addEventListener('click', e => {
     const marcar = e.target.closest('[data-marcar]');
-    if (marcar) { selecionar(+marcar.dataset.marcar); marcarPosicao(+marcar.dataset.marcar); return; }
+    if (marcar) { selecionar(+marcar.dataset.marcar); marcarPosicao(+marcar.dataset.marcar, marcar.dataset.alvo || ''); return; }
     const acao = e.target.closest('[data-acao]');
     if (acao) {
       const i = +acao.dataset.i;
@@ -650,7 +665,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
 
   window.ajAuto.onPosition(({ x, y }) => { // tecla F8
     const p = passos[selecionado];
-    if (p && (p.tipo === 'clique' || p.tipo === 'mover')) {
+    if (p && ACEITA_POSICAO.has(p.tipo)) {
       p.x = x; p.y = y;
       const el = linha(selecionado);
       el.querySelector('[data-campo="x"]').value = x;
@@ -732,6 +747,30 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   });
   $('auto-parar').addEventListener('click', () => window.ajAuto.stop());
 
+  // ---------- gravar ----------
+  $('auto-gravar').addEventListener('click', () => window.ajAuto.record());
+  $('auto-mini').addEventListener('click', () => window.ajAuto.mini(true));
+  $('auto-topo').addEventListener('change', e => window.ajAuto.sempreEmCima(e.target.checked));
+
+  function usarGravacao(novosPassos, modo) {
+    passos = modo === 'fim' ? passos.concat(novosPassos) : novosPassos;
+    selecionado = -1;
+    render(); guardar();
+    aviso(`Pronto: <b>${novosPassos.length}</b> ${novosPassos.length === 1 ? 'passo' : 'passos'} na lista. Confira e aperte <b>Salvar</b>.`, 'ok');
+  }
+  function receberGravacao(novosPassos) {
+    if (!novosPassos.length) { aviso('Nada foi gravado. Comece a gravar e faça os cliques e digitações.', 'erro'); return; }
+    if (!passos.length) { usarGravacao(novosPassos, 'trocar'); return; }
+    aviso(`Gravei <b>${novosPassos.length}</b> passos. O que faço com os ${passos.length} que já estão na tela?
+      <button type="button" class="btn" data-gravacao="trocar">Trocar pelos novos</button>
+      <button type="button" class="btn" data-gravacao="fim">Juntar no fim</button>
+      <button type="button" class="btn" data-gravacao="descartar">Descartar gravação</button>`, 'ok');
+    $('auto-status').querySelectorAll('[data-gravacao]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.gravacao === 'descartar') { aviso('Gravação descartada.'); return; }
+      usarGravacao(novosPassos, b.dataset.gravacao);
+    }, { once: true }));
+  }
+
   window.ajAuto.onEvent(evento => {
     if (evento.tipo === 'inicio') {
       rodando = true;
@@ -750,6 +789,16 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       rodando = false;
       $('auto-rodar').disabled = false; $('auto-parar').disabled = true;
       document.querySelectorAll('.step.agora').forEach(el => el.classList.remove('agora'));
+    } else if (evento.tipo === 'gravando') {
+      $('auto-gravar').classList.add('ativo');
+      $('auto-gravar').textContent = '■ Parar a gravação (Insert)';
+      $('auto-rodar').disabled = true;
+      aviso(`Gravando tudo que você faz… <b>${evento.total}</b> ${evento.total === 1 ? 'ação' : 'ações'} · aperte <b>Insert</b> para parar`, 'gravando');
+    } else if (evento.tipo === 'gravado') {
+      $('auto-gravar').classList.remove('ativo');
+      $('auto-gravar').textContent = '● Gravar o que eu fizer (Insert)';
+      $('auto-rodar').disabled = false;
+      receberGravacao(evento.passos);
     }
   });
 

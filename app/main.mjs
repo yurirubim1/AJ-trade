@@ -26,16 +26,54 @@ let win = null;
 let status = { state: 'idle', step: '', pct: 0, updatedAt: readConfig().lastUpdate || null };
 let updating = null;
 let macros = null;
+let mini = null;
+let hotkeysLigados = false;
 
-// Aba Automação: F8 marca a posição do mouse, F9 para tudo. Só ficam ligados com a aba aberta.
+// Aba Automação: F8 marca a posição do mouse, F9 para tudo, Insert grava.
+// Só ficam ligados com a aba aberta (ou com a janelinha compacta).
 function setHotkeys(on) {
   globalShortcut.unregisterAll();
+  hotkeysLigados = !!on;
   if (!on) return;
   globalShortcut.register('F8', () => {
     const ponto = screen.dipToScreenPoint(screen.getCursorScreenPoint()); // pixels de verdade, como o runner usa
-    win?.webContents.send('aj:auto-position', { x: Math.round(ponto.x), y: Math.round(ponto.y) });
+    paraTodos('aj:auto-position', { x: Math.round(ponto.x), y: Math.round(ponto.y) });
   });
   globalShortcut.register('F9', () => { if (macros?.running) macros.stop(); });
+  globalShortcut.register('Insert', () => alternarGravacao());
+}
+
+const paraTodos = (canal, dados) => {
+  for (const janela of [win, mini]) if (janela && !janela.isDestroyed()) janela.webContents.send(canal, dados);
+};
+
+function alternarGravacao() {
+  if (!macros) return false;
+  if (macros.recording) { macros.stopRecording(); return false; }
+  return macros.startRecording();
+}
+
+function abrirMini(abrir) {
+  if (!abrir) {
+    mini?.destroy();
+    mini = null;
+    win?.show();
+    return false;
+  }
+  if (mini && !mini.isDestroyed()) { mini.focus(); return true; }
+  mini = new BrowserWindow({
+    width: 300, height: 208, resizable: false, minimizable: true, maximizable: false, fullscreenable: false,
+    alwaysOnTop: true, skipTaskbar: false, title: 'AJ Trade Value',
+    backgroundColor: '#14201A', icon: path.join(appRoot, 'build', 'icon.ico'),
+    autoHideMenuBar: true,
+    webPreferences: { preload: path.join(appRoot, 'app', 'preload.cjs'), spellcheck: false },
+  });
+  mini.setMenu(null);
+  mini.loadURL('aj://app/mini.html');
+  setHotkeys(true); // na janelinha os atalhos ficam sempre valendo
+  mini.on('closed', () => { mini = null; if (win && !win.isDestroyed()) win.show(); });
+  win?.hide();
+  return true;
 }
 
 function setStatus(next) {
@@ -146,6 +184,8 @@ function createWindow() {
         await new Promise(r => setTimeout(r, Number(process.env.AJ_WAIT) || 900));
       }
       if (process.env.AJ_EVAL) {
+        win.show(); win.focus();
+        await new Promise(r => setTimeout(r, 400));
         const resultado = await win.webContents.executeJavaScript(process.env.AJ_EVAL).catch(err => `erro: ${err.message}`);
         console.log('AJ_EVAL:', JSON.stringify(resultado));
       }
@@ -179,13 +219,22 @@ else {
   ipcMain.handle('aj:update-now', () => update({ manual: true }));
   ipcMain.handle('aj:status', () => status);
 
-  macros = new Macros({ appRoot, userDir, onEvent: evento => win?.webContents.send('aj:auto-event', evento) });
+  macros = new Macros({ appRoot, userDir, onEvent: evento => paraTodos('aj:auto-event', evento) });
   ipcMain.handle('aj:auto-list', () => macros.list());
   ipcMain.handle('aj:auto-save', (_e, macro) => macros.save(macro));
   ipcMain.handle('aj:auto-delete', (_e, id) => macros.remove(id));
   ipcMain.handle('aj:auto-run', (_e, plan) => macros.run(plan));
   ipcMain.handle('aj:auto-stop', () => macros.stop());
   ipcMain.handle('aj:auto-hotkeys', (_e, on) => setHotkeys(!!on));
+  ipcMain.handle('aj:auto-record', (_e, ligar) => (ligar === undefined ? alternarGravacao() : (ligar ? macros.startRecording() : macros.stopRecording())));
+  ipcMain.handle('aj:auto-recording', () => macros.recording);
+  ipcMain.handle('aj:auto-run-id', (_e, id) => {
+    const macro = macros.list().find(m => m.id === id);
+    if (!macro) throw new Error('Automação não encontrada.');
+    return macros.run(macro);
+  });
+  ipcMain.handle('aj:mini', (_e, abrir) => abrirMini(abrir));
+  ipcMain.handle('aj:sempre-em-cima', (_e, ligar) => { win?.setAlwaysOnTop(!!ligar); return !!ligar; });
   ipcMain.handle('aj:auto-cursor', () => {
     const ponto = screen.dipToScreenPoint(screen.getCursorScreenPoint());
     return { x: Math.round(ponto.x), y: Math.round(ponto.y) };
