@@ -57,8 +57,17 @@ const paraTodos = (canal, dados) => {
 
 function alternarGravacao() {
   if (!macros) return false;
-  if (macros.recording) { macros.stopRecording(teclaGravar().toLowerCase()); return false; }
+  if (macros.recording) { macros.stopRecording(opcoesDeLimpeza()); return false; }
   return macros.startRecording();
+}
+
+// Onde estão as janelas do aplicativo, em pixels de verdade: cliques ali dentro
+// (no botão Gravar, por exemplo) não entram na gravação.
+function opcoesDeLimpeza() {
+  const areas = [win, mini]
+    .filter(j => j && !j.isDestroyed() && j.isVisible())
+    .map(j => screen.dipToScreenRect(j, j.getBounds()));
+  return { teclaIgnorar: teclaGravar().toLowerCase(), areas };
 }
 
 function abrirMini(abrir) {
@@ -234,7 +243,7 @@ else {
   ipcMain.handle('aj:auto-run', (_e, plan) => macros.run(plan));
   ipcMain.handle('aj:auto-stop', () => macros.stop());
   ipcMain.handle('aj:auto-hotkeys', (_e, on) => setHotkeys(!!on));
-  ipcMain.handle('aj:auto-record', (_e, ligar) => (ligar === undefined ? alternarGravacao() : (ligar ? macros.startRecording() : macros.stopRecording(teclaGravar().toLowerCase()))));
+  ipcMain.handle('aj:auto-record', (_e, ligar) => (ligar === undefined ? alternarGravacao() : (ligar ? macros.startRecording() : macros.stopRecording(opcoesDeLimpeza()))));
   ipcMain.handle('aj:auto-recording', () => macros.recording);
   ipcMain.handle('aj:auto-run-id', (_e, id) => {
     const macro = macros.list().find(m => m.id === id);

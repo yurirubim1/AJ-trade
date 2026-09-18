@@ -49,9 +49,10 @@ export class Macros {
     fs.writeFileSync(script, fs.readFileSync(this.recorderSource));
     const eventos = [];
     const proc = spawn(POWERSHELL, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { windowsHide: true });
-    this.recorder = { proc, eventos };
+    this.recorder = { proc, eventos, inicio: Date.now() };
     let buffer = '';
     proc.stdout.on('data', chunk => {
+      if (this.recorder?.proc !== proc) return; // gravação já encerrada: o que chegar atrasado é descartado
       buffer += chunk.toString('utf8');
       const linhas = buffer.split(/\r?\n/);
       buffer = linhas.pop() || '';
@@ -65,14 +66,24 @@ export class Macros {
     return true;
   }
 
-  // teclaIgnorar: a tecla que liga/desliga a gravação não deve virar um passo
-  stopRecording(teclaIgnorar = '') {
+  // Limpa o que é do próprio ato de gravar: a tecla que liga/desliga, os cliques dentro
+  // das janelas do aplicativo (o botão Gravar, por exemplo) e o finzinho da gravação.
+  stopRecording({ teclaIgnorar = '', areas = [], margemFinal = 500 } = {}) {
     if (!this.recorder) return [];
-    const { proc, eventos } = this.recorder;
+    const { proc, eventos, inicio } = this.recorder;
     this.recorder = null;
     execFile('taskkill', ['/pid', String(proc.pid), '/t', '/f'], () => {});
-    const limpos = teclaIgnorar ? eventos.filter(e => !(e.tipo === 'tecla' && e.tecla === teclaIgnorar)) : eventos;
+
+    const fim = Date.now() - inicio;
+    const dentroDoApp = e => areas.some(a => e.x >= a.x && e.x <= a.x + a.width && e.y >= a.y && e.y <= a.y + a.height);
+    const limpos = eventos.filter(e => {
+      if (teclaIgnorar && e.tipo === 'tecla' && e.tecla === teclaIgnorar) return false;
+      if ((e.tipo === 'clique' || e.tipo === 'arrastar') && dentroDoApp(e)) return false;
+      if (e.t > fim - margemFinal) return false; // o clique ou a tecla que encerrou a gravação
+      return true;
+    });
     const passos = eventosParaPassos(limpos);
+    while (passos.length && passos[passos.length - 1].tipo === 'esperar') passos.pop(); // pausa antes de encerrar
     this.onEvent({ tipo: 'gravado', passos });
     return passos;
   }
