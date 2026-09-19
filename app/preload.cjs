@@ -22,7 +22,16 @@ contextBridge.exposeInMainWorld('ajAuto', {
   definirTeclaGravar: tecla => ipcRenderer.invoke('aj:auto-tecla-gravar', tecla),
   isRecording: () => ipcRenderer.invoke('aj:auto-recording'),
   mini: abrir => ipcRenderer.invoke('aj:mini', abrir),
+  recortar: modo => ipcRenderer.invoke('aj:auto-recortar', modo),
+  imagem: id => ipcRenderer.invoke('aj:auto-imagem', id),
   sempreEmCima: ligar => ipcRenderer.invoke('aj:sempre-em-cima', ligar),
   onEvent: callback => ipcRenderer.on('aj:auto-event', (_event, evento) => callback(evento)),
   onPosition: callback => ipcRenderer.on('aj:auto-position', (_event, ponto) => callback(ponto)),
+});
+
+// Janela de recorte: recebe a foto da tela e devolve o retângulo escolhido.
+contextBridge.exposeInMainWorld('ajRecorte', {
+  onFoto: callback => ipcRenderer.on('aj:recorte-foto', (_event, dados) => callback(dados)),
+  concluir: retangulo => ipcRenderer.send('aj:recorte-fim', retangulo),
+  cancelar: () => ipcRenderer.send('aj:recorte-fim', null),
 });

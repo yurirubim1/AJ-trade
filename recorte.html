@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Recortar da tela</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#000;cursor:crosshair;user-select:none;font:600 14px/1.3 "Segoe UI",system-ui,sans-serif}
+#foto{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+#escuro{position:fixed;inset:0;background:rgba(0,0,0,.45);pointer-events:none}
+#caixa{position:fixed;display:none;outline:2px solid #4CC3CF;box-shadow:0 0 0 9999px rgba(0,0,0,.45);background:transparent;pointer-events:none}
+#medida{position:absolute;left:0;top:-26px;background:#4CC3CF;color:#062226;padding:3px 8px;border-radius:6px;white-space:nowrap;font-size:12px}
+#ajuda{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:rgba(12,21,17,.92);color:#E3EEE7;padding:10px 16px;border-radius:12px;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#ajuda b{color:#4CC3CF}
+</style>
+</head>
+<body>
+<img id="foto" alt="">
+<div id="escuro"></div>
+<div id="caixa"><span id="medida"></span></div>
+<div id="ajuda">Arraste para marcar <b id="oque">a imagem</b> · <b>Esc</b> cancela</div>
+<script>
+(() => {
+  const foto = document.getElementById('foto'), caixa = document.getElementById('caixa'), medida = document.getElementById('medida');
+  let inicio = null, atual = null;
+  window.ajRecorte.onFoto(({ foto: url, modo }) => {
+    foto.src = url;
+    document.getElementById('oque').textContent = modo === 'area' ? 'a área onde procurar' : 'a imagem que o programa deve achar';
+  });
+  const retangulo = () => {
+    const x = Math.min(inicio.x, atual.x), y = Math.min(inicio.y, atual.y);
+    return { x, y, w: Math.abs(atual.x - inicio.x), h: Math.abs(atual.y - inicio.y) };
+  };
+  const desenhar = () => {
+    const r = retangulo();
+    Object.assign(caixa.style, { display: 'block', left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
+    medida.textContent = `${Math.round(r.w * devicePixelRatio)} × ${Math.round(r.h * devicePixelRatio)}`;
+    document.getElementById('escuro').style.display = 'none';
+  };
+  addEventListener('mousedown', e => { if (e.button !== 0) return; inicio = atual = { x: e.clientX, y: e.clientY }; desenhar(); });
+  addEventListener('mousemove', e => { if (!inicio) return; atual = { x: e.clientX, y: e.clientY }; desenhar(); });
+  addEventListener('mouseup', e => {
+    if (!inicio) return;
+    atual = { x: e.clientX, y: e.clientY };
+    const r = retangulo();
+    inicio = null;
+    if (r.w < 4 || r.h < 4) { caixa.style.display = 'none'; return; } // clique solto: deixa tentar de novo
+    window.ajRecorte.concluir(r);
+  });
+  addEventListener('keydown', e => { if (e.key === 'Escape') window.ajRecorte.cancelar(); });
+  addEventListener('contextmenu', e => { e.preventDefault(); window.ajRecorte.cancelar(); });
+})();
+</script>
+</body>
+</html>

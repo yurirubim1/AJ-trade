@@ -80,7 +80,7 @@ button.gravar.ativo{background:var(--loss); color:#fff}
   window.ajAuto.onEvent(evento => {
     if (evento.tipo === 'inicio') {
       rodando = true; $('rodar').disabled = true; $('parar').disabled = false;
-      estado(`Rodando ${evento.passos} passos, ${evento.repeticoes}×`, 'rodando');
+      estado(`Rodando ${evento.passos} passos, ${evento.repeticoes ? `${evento.repeticoes}×` : 'sem parar'}`, 'rodando');
     } else if (evento.tipo === 'passo') {
       estado(`Passo ${evento.passo}`, 'rodando');
     } else if (evento.tipo === 'volta') {
@@ -89,6 +89,10 @@ button.gravar.ativo{background:var(--loss); color:#fff}
       estado('Terminou.', 'ok');
     } else if (evento.tipo === 'erro') {
       estado(evento.mensagem, 'erro');
+    } else if (evento.tipo === 'aviso') {
+      estado(`🔔 ${evento.texto}`, 'ok');
+    } else if (evento.tipo === 'visao') {
+      estado(evento.resultado === 'achou' ? '👁 achei a imagem' : evento.resultado === 'sumiu' ? '👁 a imagem saiu' : '👁 não achei', 'rodando');
     } else if (evento.tipo === 'parou') {
       rodando = false; $('rodar').disabled = false; $('parar').disabled = true;
     } else if (evento.tipo === 'gravando') {

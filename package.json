@@ -1,6 +1,6 @@
 {
   "name": "aj-trade-value",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "private": true,
   "description": "Calculadora de trocas do Animal Jam Classic com valores do AJ Item Worth Wiki",
   "author": "yurirubim1",
@@ -24,7 +24,7 @@
     "productName": "AJ Trade Value",
     "copyright": "Feito por fãs. Valores do AJ Item Worth Wiki (CC BY-SA).",
     "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["index.html", "mini.html", "items.js", "img/**/*", "app/**/*", "scripts/lib/**/*", "build/icon.ico", "package.json"],
+    "files": ["index.html", "mini.html", "recorte.html", "items.js", "img/**/*", "app/**/*", "scripts/lib/**/*", "build/icon.ico", "package.json"],
     "asar": true,
     "compression": "maximum",
     "win": {

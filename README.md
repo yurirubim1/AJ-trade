@@ -29,6 +29,20 @@ Passos disponíveis: **clique** (posição, botão, número de cliques), **mover
 - A espera antes de começar (3 segundos por padrão) serve para você trocar de janela.
 - As automações ficam salvas por nome e o rascunho atual volta sozinho quando você reabre o app.
 
+#### Ver a tela (automação por imagem)
+
+Passos que olham a tela antes de agir:
+
+- **Esperar imagem** — espera uma imagem aparecer (ou sumir), com tempo limite opcional; pode clicar nela quando aparecer.
+- **Clicar na imagem** — acha a imagem e clica no meio dela.
+- **Se aparecer imagem…** — se achar qualquer uma das imagens da lista, vai para um passo; se não achar, para outro.
+- **Ir para passo** e **Aviso** (notificação do Windows com som).
+- **Sem parar (até o F9)** — repete a automação indefinidamente.
+
+As imagens são recortadas da sua própria tela com **📷 Recortar da tela** (o app some, você arrasta um retângulo em cima da foto da tela). **📐 Marcar área** limita onde procurar. A busca compara as cores ponto a ponto, com uma tolerância ajustável: numa tela de 1920×1080 leva uns 25 ms quando acha e uns 250 ms quando não acha; com área marcada, bem menos.
+
+**Modelo: fechar trocas do AJ** monta um fluxo pronto: espera a janela "Trade Requested", olha a grade de itens oferecidos e, se nenhum item da sua lista estiver lá, clica em Cancel. Se tiver, toca um aviso e espera você decidir — o programa nunca aceita troca sozinho. Cada passo do modelo diz (📌) o que recortar. Atenção: o Animal Jam proíbe programas que jogam sozinhos, então use só em conta de teste.
+
 Os cliques e teclas são enviados pelo Windows (`SendInput`) através de `app/runner.ps1`, num PowerShell separado — por isso o F9 consegue interromper na hora. Detalhes que importam: as teclas vão para a **janela que estiver em foco**, então confira qual janela está na frente antes de rodar; e programas abertos como administrador só recebem os comandos se o aplicativo também estiver como administrador.
 
 ## Como usar (versão site)

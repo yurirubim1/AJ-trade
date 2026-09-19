@@ -102,6 +102,20 @@ input[type="number"]{width:98px; font-variant-numeric:tabular-nums}
 .auto-status.gravando{color:var(--loss)}
 .btn.gravar{margin-left:auto; border-color:var(--loss); color:var(--loss)}
 .btn.gravar.ativo{background:var(--loss); border-color:var(--loss); color:#fff}
+.auto-add.visao{background:var(--fair-soft); border-radius:12px; padding:8px 10px}
+.btn.modelo{margin-left:auto; background:var(--fair); border-color:var(--fair); color:#fff}
+.step[data-tipo="esperarImagem"], .step[data-tipo="cliqueImagem"], .step[data-tipo="seImagem"]{--step-color:var(--fair)}
+.step[data-tipo="irPara"]{--step-color:var(--muted)} .step[data-tipo="avisar"]{--step-color:var(--give)}
+.step .imagens{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.step .miniatura{position:relative; height:44px; min-width:44px; max-width:140px; border:1px solid var(--line-strong); border-radius:8px; background:var(--photo); display:grid; place-items:center; overflow:hidden}
+.step .miniatura img{max-height:42px; max-width:138px; display:block}
+.step .miniatura button{position:absolute; top:1px; right:1px; width:18px; height:18px; border-radius:50%; border:0; background:rgba(0,0,0,.6); color:#fff; font-size:11px; line-height:1; display:grid; place-items:center; padding:0}
+.step .recortar{border:1px dashed var(--fair); background:var(--fair-soft); color:var(--fair); border-radius:10px; padding:6px 10px; font-size:12px; font-weight:800}
+.step .recortar:hover{border-style:solid}
+.step .area{font-size:12px; color:var(--muted); display:inline-flex; gap:6px; align-items:center}
+.step .area button{border:1px solid var(--line); background:var(--surface-2); border-radius:8px; padding:4px 8px; font-size:12px; font-weight:700}
+.step .nota{flex-basis:100%; font-size:12px; color:var(--fair); font-weight:700; margin-top:-2px}
+.step .para{display:inline-flex; gap:6px; align-items:center; font-size:13px; font-weight:700; color:var(--muted)}
 .tecla-gravar{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--muted)}
 .tecla-gravar select{padding:5px 8px; font-size:13px}
 .auto-macros .fixo{display:inline-flex; align-items:center; gap:6px; text-transform:none; letter-spacing:0; font-size:13px; font-weight:700; color:var(--muted)}
@@ -400,6 +414,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       </div>
       <div class="auto-config">
         <label>Repetições <input id="auto-repeticoes" type="number" min="1" max="100000" value="1"></label>
+        <label><input type="checkbox" id="auto-semfim"> sem parar (até o F9)</label>
         <label>Tempos em <select id="auto-unidade"><option value="ms">milissegundos</option><option value="s">segundos</option></select></label>
         <label>Intervalo entre voltas <input id="auto-intervalo" type="number" min="0" step="100" value="500"><span class="un">ms</span></label>
         <label>Espera entre passos <input id="auto-atraso" type="number" min="0" step="10" value="120"><span class="un">ms</span></label>
@@ -407,8 +422,18 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       </div>
     </div>
 
+    <div class="auto-add visao">
+      <span>Ver a tela:</span>
+      <button class="btn" type="button" data-add="esperarImagem">Esperar imagem</button>
+      <button class="btn" type="button" data-add="cliqueImagem">Clicar na imagem</button>
+      <button class="btn" type="button" data-add="seImagem">Se aparecer imagem…</button>
+      <button class="btn" type="button" data-add="irPara">Ir para passo</button>
+      <button class="btn" type="button" data-add="avisar">Aviso</button>
+      <button class="btn modelo" type="button" id="auto-modelo-aj" title="Monta os passos para fechar sozinho as trocas que não têm o que você quer">✨ Modelo: fechar trocas do AJ</button>
+    </div>
+
     <div class="auto-add">
-      <span>Adicionar passo:</span>
+      <span>Mouse e teclado:</span>
       <button class="btn" type="button" data-add="clique">Clique</button>
       <button class="btn" type="button" data-add="arrastar">Arrastar</button>
       <button class="btn" type="button" data-add="mover">Mover mouse</button>
@@ -434,6 +459,8 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
         <li>Monte os passos na ordem. Cada passo espera o tempo do campo <b>depois, esperar</b>; deixando vazio, vale a "espera entre passos" lá de cima.</li>
         <li>Para marcar onde clicar, use o botão <b>📍 Marcar posição</b>: ele conta 3 segundos e guarda onde o mouse estiver. O <b>F8</b> faz o mesmo, sem contagem, no passo que estiver escolhido.</li>
         <li>O botão <b>▶</b> de cada passo executa só aquele passo, para você conferir antes de rodar tudo.</li>
+        <li><b>Ver a tela:</b> recorte com 📷 o que o programa deve achar (um botão, um título, um ícone). "Se aparecer" escolhe o caminho: se achar, vai para um passo; se não achar, para outro. Marcar a área onde procurar deixa tudo mais rápido e evita achar no lugar errado.</li>
+        <li>Recorte na mesma escala em que o programa vai rodar: se o jogo mudar de tamanho ou zoom, recorte de novo.</li>
         <li><b>F9</b> para tudo na hora, mesmo com outro programa na frente.</li>
         <li>A espera antes de começar serve para você trocar de janela antes do primeiro clique.</li>
         <li>As coordenadas são do monitor inteiro, contadas a partir do canto superior esquerdo.</li>
@@ -475,8 +502,18 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     trocas: ['Vale a troca?', 'Coloque até 4 itens de cada lado, igual à janela de troca do Animal Jam Classic. A balança mostra quem sai ganhando.'],
     auto: ['Automação', 'Monte uma sequência de cliques, textos e teclas e deixe o computador repetir para você. Serve para qualquer programa: editor, jogo em teste, formulário.'],
   };
-  const NOMES = { clique: 'Clicar', arrastar: 'Arrastar', mover: 'Mover mouse', texto: 'Escrever', tecla: 'Tecla', esperar: 'Esperar', rolar: 'Rolagem' };
+  const NOMES = {
+    clique: 'Clicar', arrastar: 'Arrastar', mover: 'Mover mouse', texto: 'Escrever', tecla: 'Tecla', esperar: 'Esperar', rolar: 'Rolagem',
+    esperarImagem: 'Esperar imagem', cliqueImagem: 'Clicar na imagem', seImagem: 'Se aparecer', irPara: 'Ir para', avisar: 'Aviso',
+  };
+  const VISAO = new Set(['esperarImagem', 'cliqueImagem', 'seImagem']);
+  const SEM_ESPERA_PADRAO = new Set(['esperar', 'irPara', 'seImagem', 'esperarImagem', 'avisar']);
   const NOVO = {
+    esperarImagem: () => ({ tipo: 'esperarImagem', imagens: [], area: null, tolerancia: 20, modo: 'aparecer', clicar: false, limite: 0, seNaoAchar: 'parar' }),
+    cliqueImagem: () => ({ tipo: 'cliqueImagem', imagens: [], area: null, tolerancia: 20, botao: 'esquerdo', seNaoAchar: 'parar' }),
+    seImagem: () => ({ tipo: 'seImagem', imagens: [], area: null, tolerancia: 20, entao: 'proximo', senao: 'proximo' }),
+    irPara: () => ({ tipo: 'irPara', passo: '1' }),
+    avisar: () => ({ tipo: 'avisar', texto: 'Olha a tela!' }),
     clique: () => ({ tipo: 'clique', x: 0, y: 0, botao: 'esquerdo', vezes: 1 }),
     arrastar: () => ({ tipo: 'arrastar', x: 0, y: 0, x2: 0, y2: 0, botao: 'esquerdo' }),
     mover: () => ({ tipo: 'mover', x: 0, y: 0 }),
@@ -501,7 +538,47 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   const numero = (p, campo, rotulo, i, extra = '') =>
     `<label title="${esc(rotulo)}">${rotulo} <input type="number" data-campo="${campo}" data-i="${i}" value="${esc(p[campo] ?? 0)}" ${extra}></label>`;
 
+  // ---------- passos de visão ----------
+  const cacheImagens = new Map();
+  async function urlDaImagem(id) {
+    if (!cacheImagens.has(id)) cacheImagens.set(id, await window.ajAuto.imagem(id));
+    return cacheImagens.get(id);
+  }
+  function blocoImagens(p, i) {
+    const imagens = (p.imagens || []).map((id, k) => `<span class="miniatura" title="Imagem ${k + 1}"><img data-img-id="${esc(id)}" alt="imagem ${k + 1}"><button type="button" data-tirar-img="${i}" data-k="${k}" title="Tirar esta imagem">×</button></span>`).join('');
+    const doadores = passos.map((q, k) => (k !== i && q.imagens?.length ? k : -1)).filter(k => k >= 0);
+    const copiar = !p.imagens?.length && doadores.length
+      ? `<select data-copiar-img="${i}"><option value="">ou copiar de…</option>${doadores.map(k => `<option value="${k}">passo ${k + 1}</option>`).join('')}</select>` : '';
+    const area = p.area ? `${p.area.w}×${p.area.h} em ${p.area.x}, ${p.area.y}` : 'a tela toda';
+    return `<span class="imagens">${imagens}<button type="button" class="recortar" data-recortar="${i}">📷 ${p.imagens?.length ? 'Mais uma imagem' : 'Recortar da tela'}</button>${copiar}</span>
+      <span class="area">procurar em <b>${area}</b> <button type="button" data-area="${i}">📐 Marcar área</button>${p.area ? `<button type="button" data-sem-area="${i}">usar a tela toda</button>` : ''}</span>
+      <label title="Quanto maior, mais diferente a imagem pode estar na tela e ainda contar como achada">tolerância <input type="number" data-campo="tolerancia" data-i="${i}" value="${p.tolerancia ?? 20}" min="1" max="100" style="width:64px"></label>`;
+  }
+  function destino(p, i, campo, rotulo, padrao) {
+    const valor = String(p[campo] ?? padrao);
+    const opcoes = [['proximo', 'seguir para o próximo'], ['parar', 'parar tudo'], ...passos.map((_, k) => [String(k + 1), `ir para o passo ${k + 1}`])];
+    return `<label class="para">${rotulo} <select data-campo="${campo}" data-i="${i}">${opcoes.map(([v, t]) => `<option value="${v}"${v === valor ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`;
+  }
+
   function campos(p, i) {
+    switch (p.tipo) {
+      case 'esperarImagem': return `${blocoImagens(p, i)}
+        <label>esperar <select data-campo="modo" data-i="${i}"><option value="aparecer"${p.modo !== 'sumir' ? ' selected' : ''}>aparecer</option><option value="sumir"${p.modo === 'sumir' ? ' selected' : ''}>sumir</option></select></label>
+        ${p.modo === 'sumir' ? '' : `<label><input type="checkbox" data-campo="clicar" data-i="${i}"${p.clicar ? ' checked' : ''}> clicar nela quando aparecer</label>`}
+        <label title="0 = esperar para sempre">desistir depois de <input type="number" data-campo="limite" data-tempo="1" data-i="${i}" value="${naTela(p.limite || 0)}" min="0" step="${passoDoCampo(true)}" style="width:80px"> ${unidade === 's' ? 's' : 'ms'}</label>
+        ${destino(p, i, 'seNaoAchar', 'se desistir:', 'parar')}`;
+      case 'cliqueImagem': return `${blocoImagens(p, i)}
+        <label>Botão <select data-campo="botao" data-i="${i}">${['esquerdo', 'direito', 'meio'].map(b => `<option${p.botao === b ? ' selected' : ''}>${b}</option>`).join('')}</select></label>
+        ${destino(p, i, 'seNaoAchar', 'se não achar:', 'parar')}`;
+      case 'seImagem': return `${blocoImagens(p, i)}
+        ${destino(p, i, 'entao', 'se achar:', 'proximo')} ${destino(p, i, 'senao', 'se não achar:', 'proximo')}`;
+      case 'irPara': return destino(p, i, 'passo', '', '1');
+      case 'avisar': return `<input class="grow" type="text" data-campo="texto" data-i="${i}" value="${esc(p.texto)}" placeholder="mensagem que aparece com som">`;
+    }
+    return camposMouseTeclado(p, i);
+  }
+
+  function camposMouseTeclado(p, i) {
     const marcar = (alvo = '', rotulo = 'Marcar posição') =>
       `<button type="button" class="marcar" data-marcar="${i}" data-alvo="${alvo}" title="Conta 3 segundos e guarda onde o mouse estiver">📍 ${rotulo}</button>`;
     switch (p.tipo) {
@@ -534,7 +611,8 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     lista.innerHTML = passos.map((p, i) => `<li class="step${i === selecionado ? ' sel' : ''}" data-tipo="${p.tipo}" data-i="${i}">
       <span class="num"></span><span class="kind">${NOMES[p.tipo]}</span>
       ${campos(p, i)}
-      ${p.tipo === 'esperar' ? '' : `<label class="depois" title="Tempo parado depois deste passo">depois, esperar <input type="number" data-campo="atraso" data-tempo="1" data-i="${i}" value="${p.atraso == null ? '' : naTela(p.atraso)}" placeholder="${naTela(padrao)}" min="0" step="${passoDoCampo(false)}"> ${unidade === 's' ? 's' : 'ms'}</label>`}
+      ${p.tipo === 'esperar' || p.tipo === 'irPara' ? '' : `<label class="depois" title="Tempo parado depois deste passo">depois, esperar <input type="number" data-campo="atraso" data-tempo="1" data-i="${i}" value="${p.atraso == null ? '' : naTela(p.atraso)}" placeholder="${naTela(SEM_ESPERA_PADRAO.has(p.tipo) ? 0 : padrao)}" min="0" step="${passoDoCampo(false)}"> ${unidade === 's' ? 's' : 'ms'}</label>`}
+      ${p.nota ? `<span class="nota">📌 ${esc(p.nota)}</span>` : ''}
       <span class="acoes">
         <button type="button" data-acao="testar" data-i="${i}" title="Executar só este passo">▶</button>
         <button type="button" data-acao="cima" data-i="${i}" title="Subir">↑</button>
@@ -543,6 +621,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
         <button type="button" data-acao="apagar" data-i="${i}" title="Remover">×</button>
       </span>
     </li>`).join('');
+    lista.querySelectorAll('img[data-img-id]').forEach(async img => { img.src = (await urlDaImagem(img.dataset.imgId)) || ''; });
   }
 
   const linha = i => document.querySelector(`.step[data-i="${i}"]`);
@@ -564,14 +643,16 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   const passoDoCampo = grosso => (unidade === 's' ? '0.1' : grosso ? '100' : '10');
 
   const config = () => ({
-    repeticoes: Math.max(1, +$('auto-repeticoes').value || 1),
+    repeticoes: $('auto-semfim').checked ? 0 : Math.max(1, +$('auto-repeticoes').value || 1),
     intervalo: Math.max(0, emMs($('auto-intervalo').value)),
     atrasoPadrao: Math.max(0, emMs($('auto-atraso').value)),
     esperaInicial: Math.max(0, emMs($('auto-inicio').value)),
     unidade,
   });
   function aplicarConfig(c = {}) {
-    $('auto-repeticoes').value = c.repeticoes ?? 1;
+    $('auto-semfim').checked = c.repeticoes === 0;
+    $('auto-repeticoes').disabled = c.repeticoes === 0;
+    $('auto-repeticoes').value = c.repeticoes || 1;
     $('auto-intervalo').value = naTela(c.intervalo ?? 500);
     $('auto-atraso').value = naTela(c.atrasoPadrao ?? 120);
     $('auto-inicio').value = naTela(c.esperaInicial ?? 3000);
@@ -579,6 +660,10 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     $('auto-unidade').value = unidade;
     document.querySelectorAll('.auto-config .un').forEach(el => (el.textContent = unidade === 's' ? 's' : 'ms'));
   }
+  $('auto-semfim').addEventListener('change', e => {
+    $('auto-repeticoes').disabled = e.target.checked;
+    guardar();
+  });
   $('auto-unidade').addEventListener('change', e => {
     const atual = config(); // lê em ms ainda com a unidade antiga
     unidade = e.target.value === 's' ? 's' : 'ms';
@@ -630,7 +715,45 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   }
 
   // ---------- eventos da lista ----------
+  async function recortarImagem(i) {
+    if (rodando) return;
+    aviso('Arraste um retângulo em volta do que o programa deve achar. <b>Esc</b> cancela.', 'contando');
+    const r = await window.ajAuto.recortar('imagem');
+    if (!r) { aviso('Recorte cancelado.'); return; }
+    cacheImagens.set(r.id, r.dataUrl);
+    (passos[i].imagens ||= []).push(r.id);
+    render(); selecionar(i); guardar();
+    aviso('Imagem guardada. Aperte o <b>▶</b> do passo para testar se o programa acha ela na tela.', 'ok');
+  }
+  async function marcarArea(i) {
+    if (rodando) return;
+    aviso('Arraste um retângulo em volta da região onde procurar (deixa a busca mais rápida e evita achar no lugar errado).', 'contando');
+    const r = await window.ajAuto.recortar('area');
+    if (!r) { aviso('Área cancelada.'); return; }
+    passos[i].area = r.area;
+    render(); selecionar(i); guardar();
+    aviso(`Área marcada: ${r.area.w}×${r.area.h} em ${r.area.x}, ${r.area.y}.`, 'ok');
+  }
+
+  $('auto-passos').addEventListener('change', e => {
+    const copiar = e.target.closest('[data-copiar-img]');
+    if (!copiar || copiar.value === '') return;
+    const i = +copiar.dataset.copiarImg, de = +copiar.value;
+    passos[i].imagens = [...(passos[de].imagens || [])];
+    passos[i].area = passos[i].area || passos[de].area || null;
+    render(); selecionar(i); guardar();
+    aviso(`Copiei as imagens do passo ${de + 1}.`, 'ok');
+  });
+
   $('auto-passos').addEventListener('click', e => {
+    const recortar = e.target.closest('[data-recortar]');
+    if (recortar) { recortarImagem(+recortar.dataset.recortar); return; }
+    const area = e.target.closest('[data-area]');
+    if (area) { marcarArea(+area.dataset.area); return; }
+    const semArea = e.target.closest('[data-sem-area]');
+    if (semArea) { passos[+semArea.dataset.semArea].area = null; render(); guardar(); return; }
+    const tirar = e.target.closest('[data-tirar-img]');
+    if (tirar) { passos[+tirar.dataset.tirarImg].imagens.splice(+tirar.dataset.k, 1); render(); guardar(); return; }
     const marcar = e.target.closest('[data-marcar]');
     if (marcar) { selecionar(+marcar.dataset.marcar); marcarPosicao(+marcar.dataset.marcar, marcar.dataset.alvo || ''); return; }
     const acao = e.target.closest('[data-acao]');
@@ -662,7 +785,8 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       passos[i].modificadores = [...mods];
     } else if (alvo.dataset.campo) {
       const campo = alvo.dataset.campo;
-      if (alvo.dataset.tempo) passos[i][campo] = alvo.value === '' ? undefined : emMs(alvo.value);
+      if (alvo.type === 'checkbox') passos[i][campo] = alvo.checked;
+      else if (alvo.dataset.tempo) passos[i][campo] = alvo.value === '' ? undefined : emMs(alvo.value);
       else passos[i][campo] = alvo.type === 'number' ? (alvo.value === '' ? undefined : +alvo.value) : alvo.value;
     }
     guardar();
@@ -771,6 +895,42 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   });
   $('auto-parar').addEventListener('click', () => window.ajAuto.stop());
 
+  // ---------- modelo pronto: fechar trocas do AJ que não têm o que você quer ----------
+  // A janela "Trade Requested" já abre com a oferta. O programa espera ela aparecer,
+  // olha a grade de itens do centro e, se nenhum item aceito estiver lá, clica em Cancel.
+  const modeloTrocasAJ = () => [
+    { tipo: 'esperarImagem', imagens: [], area: null, tolerancia: 20, modo: 'aparecer', clicar: false, limite: 0, seNaoAchar: 'parar',
+      nota: 'Recorte uma parte que nunca muda da janela de troca: o título "Trade Requested" é o melhor.' },
+    { tipo: 'seImagem', imagens: [], area: null, tolerancia: 25, entao: '5', senao: 'proximo',
+      nota: 'Recorte cada item que você aceita receber, pegando o miolo do desenho (sem a borda do quadrado). Depois use "Marcar área" em cima da grade azul de itens oferecidos.' },
+    { tipo: 'cliqueImagem', imagens: [], area: null, tolerancia: 20, botao: 'esquerdo', seNaoAchar: '1',
+      nota: 'Recorte o botão "Cancel" (o X vermelho). É ele que recusa a troca.' },
+    { tipo: 'irPara', passo: '1', nota: 'Volta a esperar a próxima troca.' },
+    { tipo: 'avisar', texto: 'Chegou uma troca com um item que você aceita! Decida no jogo.' },
+    { tipo: 'esperarImagem', imagens: [], area: null, tolerancia: 20, modo: 'sumir', clicar: false, limite: 0, seNaoAchar: 'parar',
+      nota: 'Use "copiar de… passo 1": o programa espera a janela de troca fechar (você aceitou ou recusou).' },
+    { tipo: 'irPara', passo: '1' },
+  ];
+  function usarModelo() {
+    macroId = null;
+    $('auto-nome').value = 'Fechar trocas do AJ';
+    $('auto-lista').value = '';
+    passos = modeloTrocasAJ();
+    aplicarConfig({ ...config(), repeticoes: 0, esperaInicial: 1000 });
+    selecionado = 0;
+    render(); guardar();
+    aviso('Modelo montado. Siga os 📌 de cada passo: recorte as imagens do seu jogo, teste cada uma no <b>▶</b> e depois aperte Salvar e Rodar.', 'ok');
+  }
+  $('auto-modelo-aj').addEventListener('click', () => {
+    if (!passos.length) { usarModelo(); return; }
+    aviso(`Isso troca os ${passos.length} passos da tela pelo modelo.
+      <button type="button" class="btn" data-modelo="sim">Trocar pelo modelo</button>
+      <button type="button" class="btn" data-modelo="nao">Deixar como está</button>`, 'ok');
+    $('auto-status').querySelectorAll('[data-modelo]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.modelo === 'sim') usarModelo(); else dica();
+    }, { once: true }));
+  });
+
   // ---------- gravar ----------
   let teclaGravar = 'Delete';
   function mostrarTecla(tecla) {
@@ -815,7 +975,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     if (evento.tipo === 'inicio') {
       rodando = true;
       $('auto-rodar').disabled = true; $('auto-parar').disabled = false;
-      aviso(`Rodando ${evento.passos} ${evento.passos === 1 ? 'passo' : 'passos'}, ${evento.repeticoes}× · <b>F9</b> para parar`, 'rodando');
+      aviso(`Rodando ${evento.passos} ${evento.passos === 1 ? 'passo' : 'passos'}, ${evento.repeticoes ? `${evento.repeticoes}×` : 'sem parar'} · <b>F9</b> para parar`, 'rodando');
     } else if (evento.tipo === 'passo') {
       document.querySelectorAll('.step.agora').forEach(el => el.classList.remove('agora'));
       linha(evento.passo - 1)?.classList.add('agora');
@@ -829,6 +989,16 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       rodando = false;
       $('auto-rodar').disabled = false; $('auto-parar').disabled = true;
       document.querySelectorAll('.step.agora').forEach(el => el.classList.remove('agora'));
+    } else if (evento.tipo === 'visao') {
+      const textos = {
+        achou: `👁 Achei a imagem ${evento.imagem || ''} em ${evento.x}, ${evento.y} (diferença ${evento.nota})`,
+        sumiu: '👁 A imagem saiu da tela.',
+        tempo: '👁 Passou do tempo e a imagem não apareceu.',
+        nao: '👁 Não achei a imagem na tela. Se ela está lá, aumente a tolerância ou recorte de novo.',
+      };
+      aviso(textos[evento.resultado] || textos.nao, evento.resultado === 'achou' || evento.resultado === 'sumiu' ? 'ok' : 'erro');
+    } else if (evento.tipo === 'aviso') {
+      aviso(`🔔 ${esc(evento.texto)}`, 'ok');
     } else if (evento.tipo === 'tecla-gravar') {
       mostrarTecla(evento.tecla);
     } else if (evento.tipo === 'gravando') {

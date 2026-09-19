@@ -154,6 +154,123 @@ public static class Entrada
 
 [Entrada]::PrepararTela()
 
+# ---------- visão: procurar uma imagem recortada dentro da tela ----------
+Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+
+public static class Visao
+{
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int indice);
+
+    public class Resultado { public bool Achou; public int X; public int Y; public double Nota = 255; public int Indice = -1; }
+
+    private static int[] Pixels(Bitmap bmp)
+    {
+        int w = bmp.Width, h = bmp.Height;
+        BitmapData dados = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        int[] px = new int[w * h];
+        for (int y = 0; y < h; y++) Marshal.Copy(IntPtr.Add(dados.Scan0, y * dados.Stride), px, y * w, w);
+        bmp.UnlockBits(dados);
+        return px;
+    }
+
+    // Todos os monitores juntos, em pixels de verdade.
+    public static Rectangle TelaInteira() { return new Rectangle(GetSystemMetrics(76), GetSystemMetrics(77), GetSystemMetrics(78), GetSystemMetrics(79)); }
+
+    public static Bitmap Capturar(Rectangle area)
+    {
+        Bitmap bmp = new Bitmap(area.Width, area.Height, PixelFormat.Format32bppArgb);
+        using (Graphics g = Graphics.FromImage(bmp)) g.CopyFromScreen(area.X, area.Y, 0, 0, area.Size, CopyPixelOperation.SourceCopy);
+        return bmp;
+    }
+
+    // Diferença de cor entre o modelo e a imagem numa posição. Desiste (devolve long.MaxValue)
+    // assim que a média parcial passa do limite: em posições erradas isso acontece em poucos pontos.
+    private static long Custo(int[] I, int inicio, int[] desloc, int[] cr, int[] cg, int[] cb, int n, double mediaMaxima)
+    {
+        long soma = 0;
+        double porPonto = mediaMaxima * 3;
+        for (int k = 0; k < n; k++)
+        {
+            int c = I[inicio + desloc[k]];
+            soma += Math.Abs(((c >> 16) & 255) - cr[k]) + Math.Abs(((c >> 8) & 255) - cg[k]) + Math.Abs((c & 255) - cb[k]);
+            if (soma > porPonto * (k + 1) + 120) return long.MaxValue;
+        }
+        return soma;
+    }
+
+    // Procura o modelo dentro da imagem. tolerancia = diferença média aceita por canal de cor (0 a 255).
+    // Primeiro varre de 2 em 2 pixels com folga maior e guarda os melhores candidatos;
+    // depois confere cada candidato pixel a pixel com a tolerância de verdade.
+    public static Resultado Procurar(Bitmap imagem, Bitmap modelo, double tolerancia)
+    {
+        Resultado r = new Resultado();
+        int iw = imagem.Width, ih = imagem.Height, mw = modelo.Width, mh = modelo.Height;
+        if (mw == 0 || mh == 0 || mw > iw || mh > ih) return r;
+        int[] I = Pixels(imagem), M = Pixels(modelo);
+
+        // até ~600 pontos do modelo, em ordem sorteada, para as diferenças aparecerem logo
+        int passo = Math.Max(1, (int)Math.Sqrt(mw * mh / 600.0));
+        List<int> pontos = new List<int>();
+        for (int y = 0; y < mh; y += passo) for (int x = 0; x < mw; x += passo) pontos.Add(y * mw + x);
+        Random sorteio = new Random(7);
+        for (int k = pontos.Count - 1; k > 0; k--) { int j = sorteio.Next(k + 1); int t = pontos[k]; pontos[k] = pontos[j]; pontos[j] = t; }
+        int n = pontos.Count;
+        int[] desloc = new int[n], cr = new int[n], cg = new int[n], cb = new int[n];
+        for (int k = 0; k < n; k++)
+        {
+            int p = pontos[k];
+            desloc[k] = (p / mw) * iw + (p % mw);
+            int c = M[p];
+            cr[k] = (c >> 16) & 255; cg[k] = (c >> 8) & 255; cb[k] = c & 255;
+        }
+
+        // etapa 1: grade grossa
+        double folga = Math.Max(tolerancia * 2.5, tolerancia + 25);
+        List<long[]> candidatos = new List<long[]>();
+        long corte = long.MaxValue;
+        for (int y = 0; y <= ih - mh; y += 2)
+        {
+            for (int x = 0; x <= iw - mw; x += 2)
+            {
+                long custo = Custo(I, y * iw + x, desloc, cr, cg, cb, n, folga);
+                if (custo >= corte || custo == long.MaxValue) continue;
+                candidatos.Add(new long[] { custo, x, y });
+                if (candidatos.Count > 16)
+                {
+                    candidatos.Sort((a, b) => a[0].CompareTo(b[0]));
+                    candidatos.RemoveRange(8, candidatos.Count - 8);
+                    corte = candidatos[candidatos.Count - 1][0];
+                }
+            }
+        }
+
+        // etapa 2: refino em volta de cada candidato
+        long limite = (long)(tolerancia * 3 * n);
+        long melhor = long.MaxValue;
+        int bx = -1, by = -1;
+        foreach (long[] cand in candidatos)
+        {
+            for (int y = (int)cand[2] - 1; y <= (int)cand[2] + 1; y++)
+            {
+                for (int x = (int)cand[1] - 1; x <= (int)cand[1] + 1; x++)
+                {
+                    if (x < 0 || y < 0 || x > iw - mw || y > ih - mh) continue;
+                    long custo = Custo(I, y * iw + x, desloc, cr, cg, cb, n, tolerancia * 1.5);
+                    if (custo < melhor) { melhor = custo; bx = x; by = y; }
+                }
+            }
+        }
+        if (bx >= 0 && melhor <= limite) { r.Achou = true; r.X = bx + mw / 2; r.Y = by + mh / 2; r.Nota = melhor / (3.0 * n); }
+        return r;
+    }
+}
+'@
+
 $TECLAS = @{
   'enter' = 0x0D; 'tab' = 0x09; 'esc' = 0x1B; 'escape' = 0x1B; 'espaco' = 0x20; 'space' = 0x20;
   'backspace' = 0x08; 'delete' = 0x2E; 'insert' = 0x2D; 'home' = 0x24; 'end' = 0x23;
@@ -172,10 +289,49 @@ function Resolver-Tecla([string]$nome) {
   throw "tecla desconhecida: $nome"
 }
 
+$modelos = @{}
+function Carregar-Modelo([string]$arquivo) {
+  if (-not $modelos.ContainsKey($arquivo)) { $modelos[$arquivo] = New-Object System.Drawing.Bitmap -ArgumentList $arquivo }
+  return $modelos[$arquivo]
+}
+
+# Fotografa a área do passo (ou a tela toda) e procura as imagens dele, na ordem. Devolve a primeira achada.
+function Buscar-Imagens($passo) {
+  $area = if ($passo.area) {
+    New-Object System.Drawing.Rectangle -ArgumentList ([int]$passo.area.x), ([int]$passo.area.y), ([int]$passo.area.w), ([int]$passo.area.h)
+  } else { [Visao]::TelaInteira() }
+  $tolerancia = if ($passo.tolerancia) { [double]$passo.tolerancia } else { 20 }
+  $foto = [Visao]::Capturar($area)
+  try {
+    $indice = 0
+    foreach ($arquivo in @($passo.arquivos)) {
+      if ($arquivo -and (Test-Path -LiteralPath $arquivo)) {
+        $r = [Visao]::Procurar($foto, (Carregar-Modelo $arquivo), $tolerancia)
+        if ($r.Achou) { $r.X += $area.X; $r.Y += $area.Y; $r.Indice = $indice; return $r }
+      }
+      $indice++
+    }
+  } finally { $foto.Dispose() }
+  return $null
+}
+
+function Contar-Achado($r) { Write-Output ("VISAO achou {0} {1} {2} {3}" -f $r.X, $r.Y, [Math]::Round($r.Nota, 1), ($r.Indice + 1)) }
+
+# Para onde ir depois: 'proximo', 'parar' ou o número de um passo.
+function Destino($valor, [int]$atual) {
+  if ($null -eq $valor -or "$valor" -eq '' -or "$valor" -eq 'proximo') { return $atual + 1 }
+  if ("$valor" -eq 'parar') { return -1 }
+  return [int]$valor - 1
+}
+
 $dados = Get-Content -LiteralPath $Plano -Raw -Encoding UTF8 | ConvertFrom-Json
-$atrasoPadrao = if ($dados.atrasoPadrao) { [int]$dados.atrasoPadrao } else { 120 }
-$repeticoes = if ($dados.repeticoes) { [int]$dados.repeticoes } else { 1 }
+$atrasoPadrao = if ($null -ne $dados.atrasoPadrao) { [int]$dados.atrasoPadrao } else { 120 }
+$repeticoes = if ($null -ne $dados.repeticoes) { [int]$dados.repeticoes } else { 1 }
+$semFim = $repeticoes -le 0
 $intervalo = if ($dados.intervalo) { [int]$dados.intervalo } else { 0 }
+$lista = @($dados.passos)
+$total = $lista.Count
+$SEM_ESPERA_PADRAO = @('esperar', 'irPara', 'seImagem', 'esperarImagem', 'avisar')
 
 # Sempre uma folga antes do primeiro comando: quando este processo abre, o Windows
 # leva um instante para devolver o foco à janela em que a automação deve agir.
@@ -183,11 +339,15 @@ $esperaInicial = if ($dados.esperaInicial) { [int]$dados.esperaInicial } else { 
 Start-Sleep -Milliseconds ([Math]::Max(350, $esperaInicial))
 
 try {
-  for ($volta = 1; $volta -le $repeticoes; $volta++) {
+  $volta = 0
+  $parar = $false
+  while (-not $parar -and ($semFim -or $volta -lt $repeticoes)) {
+    $volta++
     $i = 0
-    foreach ($passo in $dados.passos) {
-      $i++
-      Write-Output "PASSO $i"
+    while ($i -ge 0 -and $i -lt $total) {
+      $passo = $lista[$i]
+      Write-Output "PASSO $($i + 1)"
+      $proximo = $i + 1
       switch ($passo.tipo) {
         'mover'   { [Entrada]::Mover([int]$passo.x, [int]$passo.y) }
         'clique'  {
@@ -208,13 +368,50 @@ try {
         }
         'rolar'   { [Entrada]::Rolar([int]$passo.quantidade) }
         'esperar' { Start-Sleep -Milliseconds ([int]$passo.ms) }
+        'esperarImagem' {
+          # modo 'aparecer' espera surgir; modo 'sumir' espera deixar de estar na tela
+          $sumir = $passo.modo -eq 'sumir'
+          $limite = [int]$passo.limite
+          $relogio = [Diagnostics.Stopwatch]::StartNew()
+          $achado = Buscar-Imagens $passo
+          while ((($sumir -and $achado) -or (-not $sumir -and -not $achado)) -and ($limite -le 0 -or $relogio.ElapsedMilliseconds -lt $limite)) {
+            Start-Sleep -Milliseconds 250
+            $achado = Buscar-Imagens $passo
+          }
+          $conseguiu = if ($sumir) { -not $achado } else { [bool]$achado }
+          if ($conseguiu -and $achado -and $passo.clicar) {
+            [Entrada]::Mover($achado.X, $achado.Y); Start-Sleep -Milliseconds 40
+            [Entrada]::Clique('esquerdo', 1, 60)
+          }
+          if ($conseguiu) { if ($achado) { Contar-Achado $achado } else { Write-Output 'VISAO sumiu' } }
+          else { Write-Output 'VISAO tempo'; $proximo = Destino ($(if ($passo.seNaoAchar) { $passo.seNaoAchar } else { 'parar' })) $i }
+        }
+        'avisar' { Write-Output ("AVISO " + ([string]$passo.texto -replace "[`r`n]+", ' ')) }
+        'cliqueImagem' {
+          $achado = Buscar-Imagens $passo
+          if ($achado) {
+            Contar-Achado $achado
+            [Entrada]::Mover($achado.X, $achado.Y); Start-Sleep -Milliseconds 40
+            $botao = if ($passo.botao) { [string]$passo.botao } else { 'esquerdo' }
+            [Entrada]::Clique($botao, 1, 60)
+          } else { Write-Output 'VISAO nao'; $proximo = Destino ($(if ($passo.seNaoAchar) { $passo.seNaoAchar } else { 'parar' })) $i }
+        }
+        'seImagem' {
+          $achado = Buscar-Imagens $passo
+          if ($achado) { Contar-Achado $achado; $proximo = Destino $passo.entao $i }
+          else { Write-Output 'VISAO nao'; $proximo = Destino $passo.senao $i }
+        }
+        'irPara'  { $proximo = Destino $passo.passo $i }
         default   { throw "passo desconhecido: $($passo.tipo)" }
       }
-      $espera = if ($null -ne $passo.atraso) { [int]$passo.atraso } else { $atrasoPadrao }
-      if ($passo.tipo -ne 'esperar' -and $espera -gt 0) { Start-Sleep -Milliseconds $espera }
+      $espera = if ($null -ne $passo.atraso) { [int]$passo.atraso } elseif ($SEM_ESPERA_PADRAO -contains $passo.tipo) { 0 } else { $atrasoPadrao }
+      if ($espera -gt 0) { Start-Sleep -Milliseconds $espera }
+      if ($proximo -lt 0) { $parar = $true; break }
+      $i = $proximo
+      Start-Sleep -Milliseconds 5  # evita girar sem parar quando os passos só pulam entre si
     }
     Write-Output "VOLTA $volta"
-    if ($volta -lt $repeticoes -and $intervalo -gt 0) { Start-Sleep -Milliseconds $intervalo }
+    if (-not $parar -and ($semFim -or $volta -lt $repeticoes) -and $intervalo -gt 0) { Start-Sleep -Milliseconds $intervalo }
   }
   Write-Output 'FIM'
 } catch {

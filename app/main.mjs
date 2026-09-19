@@ -1,7 +1,7 @@
 // AJ Trade Value — processo principal do aplicativo.
 // Abre a janela, serve os arquivos do site por um protocolo próprio (aj://) e
 // atualiza os valores do wiki uma vez por dia.
-import { app, BrowserWindow, Menu, ipcMain, protocol, net, shell, dialog, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, protocol, net, shell, dialog, globalShortcut, screen, desktopCapturer, Notification } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -68,6 +68,54 @@ function opcoesDeLimpeza() {
     .filter(j => j && !j.isDestroyed() && j.isVisible())
     .map(j => screen.dipToScreenRect(j, j.getBounds()));
   return { teclaIgnorar: teclaGravar().toLowerCase(), areas };
+}
+
+// ---------- recortar da tela ----------
+// Esconde o aplicativo, fotografa o monitor onde está o mouse e mostra a foto em tela cheia
+// para a pessoa arrastar um retângulo. modo 'imagem' guarda o recorte; modo 'area' só a posição.
+let recorteAberto = null;
+async function recortarTela(modo) {
+  if (recorteAberto) return null;
+  const monitor = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const escala = monitor.scaleFactor;
+  const visiveis = [win, mini].filter(j => j && !j.isDestroyed() && j.isVisible());
+  visiveis.forEach(j => j.hide());
+  await new Promise(r => setTimeout(r, 350)); // tempo do Windows tirar as janelas da tela
+  let foto;
+  try {
+    const fontes = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: Math.round(monitor.size.width * escala), height: Math.round(monitor.size.height * escala) },
+    });
+    foto = (fontes.find(f => f.display_id === String(monitor.id)) || fontes[0]).thumbnail;
+  } catch (err) {
+    visiveis.forEach(j => j.show());
+    throw err;
+  }
+
+  const janela = new BrowserWindow({
+    ...monitor.bounds, frame: false, resizable: false, movable: false, fullscreen: true,
+    alwaysOnTop: true, skipTaskbar: true, backgroundColor: '#000000',
+    webPreferences: { preload: path.join(appRoot, 'app', 'preload.cjs') },
+  });
+  const escolhido = await new Promise(resolve => {
+    recorteAberto = { resolve };
+    janela.on('closed', () => resolve(null));
+    janela.webContents.once('did-finish-load', () => janela.webContents.send('aj:recorte-foto', { foto: foto.toDataURL(), modo }));
+    janela.loadURL('aj://app/recorte.html');
+  });
+  recorteAberto = null;
+  if (!janela.isDestroyed()) janela.destroy();
+  visiveis.forEach(j => j.show());
+  if (!escolhido || escolhido.w < 4 || escolhido.h < 4) return null;
+
+  // escolhido vem em pixels da janela de recorte; a tela e o executor usam pixels de verdade
+  const naTela = screen.dipToScreenRect(null, { x: monitor.bounds.x + escolhido.x, y: monitor.bounds.y + escolhido.y, width: escolhido.w, height: escolhido.h });
+  const area = { x: Math.round(naTela.x), y: Math.round(naTela.y), w: Math.round(naTela.width), h: Math.round(naTela.height) };
+  if (modo === 'area') return { area };
+  const pedaco = foto.crop({ x: Math.round(escolhido.x * escala), y: Math.round(escolhido.y * escala), width: Math.round(escolhido.w * escala), height: Math.round(escolhido.h * escala) });
+  const id = macros.saveImage(pedaco.toPNG());
+  return { id, area, dataUrl: macros.imageDataUrl(id) };
 }
 
 function abrirMini(abrir) {
@@ -236,7 +284,18 @@ else {
   ipcMain.handle('aj:update-now', () => update({ manual: true }));
   ipcMain.handle('aj:status', () => status);
 
-  macros = new Macros({ appRoot, userDir, onEvent: evento => paraTodos('aj:auto-event', evento) });
+  macros = new Macros({
+    appRoot, userDir,
+    onEvent: evento => {
+      paraTodos('aj:auto-event', evento);
+      if (evento.tipo === 'aviso' && Notification.isSupported()) {
+        new Notification({ title: 'AJ Trade Value', body: evento.texto || 'Aviso da automação', icon: path.join(appRoot, 'build', 'icon.ico') }).show();
+      }
+    },
+  });
+  ipcMain.handle('aj:auto-recortar', (_e, modo) => recortarTela(modo === 'area' ? 'area' : 'imagem'));
+  ipcMain.handle('aj:auto-imagem', (_e, id) => macros.imageDataUrl(id));
+  ipcMain.on('aj:recorte-fim', (_e, escolhido) => recorteAberto?.resolve(escolhido));
   ipcMain.handle('aj:auto-list', () => macros.list());
   ipcMain.handle('aj:auto-save', (_e, macro) => macros.save(macro));
   ipcMain.handle('aj:auto-delete', (_e, id) => macros.remove(id));

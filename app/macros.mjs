@@ -34,11 +34,23 @@ export class Macros {
     this.recorderSource = path.join(appRoot, 'app', 'recorder.ps1');
     this.dir = path.join(userDir, 'macros');
     this.runDir = path.join(userDir, 'execucao');
+    this.imgDir = path.join(userDir, 'imagens');
     this.onEvent = onEvent;
     this.child = null;
     this.recorder = null;
-    fs.mkdirSync(this.dir, { recursive: true });
-    fs.mkdirSync(this.runDir, { recursive: true });
+    for (const d of [this.dir, this.runDir, this.imgDir]) fs.mkdirSync(d, { recursive: true });
+  }
+
+  // Imagens recortadas da tela, usadas pelos passos de visão.
+  saveImage(png) {
+    const id = `i${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    fs.writeFileSync(this.imagePath(id), png);
+    return id;
+  }
+  imagePath(id) { return path.join(this.imgDir, `${path.basename(String(id))}.png`); }
+  imageDataUrl(id) {
+    const arquivo = this.imagePath(id);
+    return fs.existsSync(arquivo) ? `data:image/png;base64,${fs.readFileSync(arquivo).toString('base64')}` : null;
   }
 
   get recording() { return !!this.recorder; }
@@ -111,11 +123,14 @@ export class Macros {
   run(plan) {
     if (this.child) throw new Error('Já tem uma automação rodando.');
     if (!plan?.passos?.length) throw new Error('A automação não tem nenhum passo.');
+    const semImagem = plan.passos.findIndex(p => p.imagens && !p.imagens.length);
+    if (semImagem >= 0) throw new Error(`O passo ${semImagem + 1} precisa de pelo menos uma imagem recortada.`);
     // o runner sai do pacote para o disco: o PowerShell não lê de dentro do app.asar
     const runner = path.join(this.runDir, 'runner.ps1');
     fs.writeFileSync(runner, fs.readFileSync(this.runnerSource));
     const planFile = path.join(this.runDir, 'plano.json');
-    fs.writeFileSync(planFile, JSON.stringify(plan), 'utf8');
+    const paraExecutar = { ...plan, passos: plan.passos.map(p => (p.imagens ? { ...p, arquivos: p.imagens.map(id => this.imagePath(id)) } : p)) };
+    fs.writeFileSync(planFile, JSON.stringify(paraExecutar), 'utf8');
 
     this.child = spawn(POWERSHELL, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', runner, '-Plano', planFile], { windowsHide: true });
     this.onEvent({ tipo: 'inicio', passos: plan.passos.length, repeticoes: plan.repeticoes || 1 });
@@ -130,6 +145,8 @@ export class Macros {
         if (tag === 'PASSO') this.onEvent({ tipo: 'passo', passo: Number(rest[0]) });
         else if (tag === 'VOLTA') this.onEvent({ tipo: 'volta', volta: Number(rest[0]) });
         else if (tag === 'ERRO') this.onEvent({ tipo: 'erro', mensagem: rest.join(' ') });
+        else if (tag === 'VISAO') this.onEvent({ tipo: 'visao', resultado: rest[0], x: +rest[1], y: +rest[2], nota: +rest[3], imagem: +rest[4] });
+        else if (tag === 'AVISO') this.onEvent({ tipo: 'aviso', texto: rest.join(' ') });
         else if (tag === 'FIM') this.onEvent({ tipo: 'fim' });
       }
     });
