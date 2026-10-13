@@ -106,7 +106,6 @@ input[type="number"]{width:98px; font-variant-numeric:tabular-nums}
 .btn.gravar{margin-left:auto; border-color:var(--loss); color:var(--loss)}
 .btn.gravar.ativo{background:var(--loss); border-color:var(--loss); color:#fff}
 .auto-add.visao{background:var(--fair-soft); border-radius:12px; padding:8px 10px}
-.btn.modelo{margin-left:auto; background:var(--fair); border-color:var(--fair); color:#fff}
 .step[data-tipo="esperarImagem"], .step[data-tipo="cliqueImagem"], .step[data-tipo="seImagem"]{--step-color:var(--fair)}
 .step[data-tipo="irPara"]{--step-color:var(--muted)} .step[data-tipo="avisar"]{--step-color:var(--give)}
 .step .imagens{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
@@ -434,7 +433,6 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
       <button class="btn" type="button" data-add="seImagem">Se aparecer imagem…</button>
       <button class="btn" type="button" data-add="irPara">Ir para passo</button>
       <button class="btn" type="button" data-add="avisar">Aviso</button>
-      <button class="btn modelo" type="button" id="auto-modelo-aj" title="Monta os passos para fechar sozinho as trocas que não têm o que você quer">✨ Modelo: fechar trocas do AJ</button>
     </div>
 
     <div class="auto-add">
@@ -900,42 +898,6 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   });
   $('auto-parar').addEventListener('click', () => window.ajAuto.stop());
 
-  // ---------- modelo pronto: fechar trocas do AJ que não têm o que você quer ----------
-  // A janela "Trade Requested" já abre com a oferta. O programa espera ela aparecer,
-  // olha a grade de itens do centro e, se nenhum item aceito estiver lá, clica em Cancel.
-  const modeloTrocasAJ = () => [
-    { tipo: 'esperarImagem', imagens: [], area: null, tolerancia: 20, modo: 'aparecer', clicar: false, limite: 0, seNaoAchar: 'parar',
-      nota: 'Recorte uma parte que nunca muda da janela de troca: o título "Trade Requested" é o melhor.' },
-    { tipo: 'seImagem', imagens: [], area: null, tolerancia: 25, entao: '5', senao: 'proximo',
-      nota: 'Recorte cada item que você aceita receber, pegando o miolo do desenho (sem a borda do quadrado). Depois use "Marcar área" em cima da grade azul de itens oferecidos.' },
-    { tipo: 'cliqueImagem', imagens: [], area: null, tolerancia: 20, botao: 'esquerdo', seNaoAchar: '1',
-      nota: 'Recorte o botão "Cancel" (o X vermelho). É ele que recusa a troca.' },
-    { tipo: 'irPara', passo: '1', nota: 'Volta a esperar a próxima troca.' },
-    { tipo: 'avisar', texto: 'Chegou uma troca com um item que você aceita! Decida no jogo.' },
-    { tipo: 'esperarImagem', imagens: [], area: null, tolerancia: 20, modo: 'sumir', clicar: false, limite: 0, seNaoAchar: 'parar',
-      nota: 'Use "copiar de… passo 1": o programa espera a janela de troca fechar (você aceitou ou recusou).' },
-    { tipo: 'irPara', passo: '1' },
-  ];
-  function usarModelo() {
-    macroId = null;
-    $('auto-nome').value = 'Fechar trocas do AJ';
-    $('auto-lista').value = '';
-    passos = modeloTrocasAJ();
-    aplicarConfig({ ...config(), repeticoes: 0, esperaInicial: 1000 });
-    selecionado = 0;
-    render(); guardar();
-    aviso('Modelo montado. Siga os 📌 de cada passo: recorte as imagens do seu jogo, teste cada uma no <b>▶</b> e depois aperte Salvar e Rodar.', 'ok');
-  }
-  $('auto-modelo-aj').addEventListener('click', () => {
-    if (!passos.length) { usarModelo(); return; }
-    aviso(`Isso troca os ${passos.length} passos da tela pelo modelo.
-      <button type="button" class="btn" data-modelo="sim">Trocar pelo modelo</button>
-      <button type="button" class="btn" data-modelo="nao">Deixar como está</button>`, 'ok');
-    $('auto-status').querySelectorAll('[data-modelo]').forEach(b => b.addEventListener('click', () => {
-      if (b.dataset.modelo === 'sim') usarModelo(); else dica();
-    }, { once: true }));
-  });
-
   // ---------- gravar ----------
   let teclaGravar = 'Delete';
   function mostrarTecla(tecla) {
@@ -1034,7 +996,6 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
     document.querySelector('.lede').textContent = TITULOS[qual][1];
     document.querySelector('.source').hidden = qual !== 'trocas';
     window.ajAuto.hotkeys(qual === 'auto');
-    try { localStorage.setItem('aj-aba', qual); } catch {}
   }
 
   // ---------- início ----------
@@ -1051,9 +1012,7 @@ dialog.picker::backdrop{background:rgba(8,16,12,.55)}
   render();
   dica();
   recarregarLista(macroId);
-  let abaInicial = 'trocas';
-  try { abaInicial = localStorage.getItem('aj-aba') || 'trocas'; } catch {}
-  abrirAba(abaInicial);
+  abrirAba('trocas'); // o aplicativo sempre abre na balança de trocas
 })();
 </script>
 
