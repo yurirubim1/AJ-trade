@@ -18,7 +18,9 @@ O site ([aj-trade.vercel.app](https://aj-trade.vercel.app)) é publicado pelo Ve
 
 ## Atualizar os valores
 
-O app baixa os valores sozinho, mas o site usa o `items.js` e as fotos que estão no repositório. Para atualizar o site, rode o script e suba o resultado:
+O app baixa os valores sozinho. O site usa o `items.js` e as fotos que estão no repositório, e o GitHub Actions (`.github/workflows/atualizar-site.yml`) atualiza o `items.js` todo dia às 6h, horário de Brasília. Ele roda `scripts/atualizar-site.mjs`, que segue o mesmo caminho do app: reaproveita os sprites de `img/` e só sobe um commit se algum valor mudou no wiki. Itens novos mostram a foto direto do wiki.
+
+Para remontar também os sprites de fotos, rode o script completo e suba o resultado:
 
 ```bash
 npm install                       # só na primeira vez (instala o sharp, que monta as fotos)
