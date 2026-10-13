@@ -215,6 +215,7 @@ function buildMenu() {
           }),
         },
         { label: 'Código do projeto', click: () => shell.openExternal('https://github.com/yurirubim1/AJ-trade') },
+        { label: 'Apoie o desenvolvedor (Livepix)', click: () => shell.openExternal('https://livepix.gg/ajtrades') },
       ],
     },
   ]));

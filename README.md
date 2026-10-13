@@ -133,6 +133,10 @@ app/runner.ps1              envia cliques, textos e teclas para o Windows
 
 Para adicionar gírias ou nomes em português, edite `PT_NAMES` e `ALIASES` em `scripts/lib/ptdict.mjs` (e `SLANG` no `index.html` para gírias que apontam para uma cor específica) e rode o script de novo.
 
+## Apoie o desenvolvedor
+
+O AJ Trade Value é de graça e continua sendo. Se ele te ajudou e você quiser apoiar, dá para mandar um Pix de qualquer valor pelo [Livepix](https://livepix.gg/ajtrades).
+
 ## Créditos
 
 Valores e imagens: AJ Item Worth Wiki (Fandom), sob licença CC BY-SA. Nomes oficiais em português: Wiki Animal Jam pt-BR. Projeto feito por fãs, sem afiliação com a WildWorks ou o Animal Jam.
